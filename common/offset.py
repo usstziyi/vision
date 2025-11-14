@@ -3,7 +3,7 @@
 # 求锚框和真实边界框的偏移量
 # anchors(NAC,4):(xmin, ymin, xmax, ymax)
 # target_anchors(NAC,4):(xmin, ymin, xmax, ymax)
-def offset_boxes(anchors, target_anchors, eps=1e-6):
+def offset_anchors(anchors, target_anchors, eps=1e-6):
     # 一、将锚框从角点格式转换为中心点格式
     # c_anchors: (NAC, 4):(x, y, w, h)
     # c_target_anchors: (NAC, 4):(x, y, w, h)
