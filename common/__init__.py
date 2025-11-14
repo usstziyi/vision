@@ -5,7 +5,7 @@ from .ralative2pixel import relative_to_pixel
 from .show_anchors import show_anchors
 from .iou import iou 
 from .nms import nms
-
+from .bind import bind_ground_truth_to_anchor
 
 
 __all__ = [
@@ -15,5 +15,6 @@ __all__ = [
     'relative_to_pixel',
     'show_anchors',
     'iou',
-    'nms'
+    'nms',
+    'bind_ground_truth_to_anchor'
 ]

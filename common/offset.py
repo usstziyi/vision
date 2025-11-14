@@ -1,7 +1,7 @@
 import torch
-
+from d2l import torch as d2l
 '''
-    anchors到target_anchors的偏移量
+    anchors(相对尺寸)到target_anchors(相对尺寸)的偏移量
 '''
 # anchors(NAC,4):(xmin, ymin, xmax, ymax)
 # target_anchors(NAC,4):(xmin, ymin, xmax, ymax)
@@ -26,13 +26,13 @@ def offset_anchors(anchors, target_anchors, eps=1e-6):
 
     # 四、拼接中心点偏移和宽高偏移，形成最终偏移量张量
     # offset(NAC, 4):(tx, ty, tw, th)
-    offset = torch.cat([offset_xy, offset_wh], axis=1)
+    offset = torch.cat([offset_xy, offset_wh], dim=1)
     return offset
 
 
 
 '''
-    把偏移量施加到锚框上，得到预测框
+    把偏移量施加到锚框上，得到目标锚框(相对尺寸)
 '''
 # anchor(NAC,4):(xmin,ymin,xmax,ymax)
 # offset(NAC,4):(tx,ty,tw,th)

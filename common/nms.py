@@ -37,7 +37,8 @@ def nms(anchors, scores, iou_threshold):
         anchor_iou = iou(max_score_anchor, rest_anchors).reshape(-1)
         # 筛选出 IoU 小于阈值的框自然索引,保留，删除太相似的anchor
         # inds: (M,)  保留的索引，M <= N-1
-        # torch.nonzero返回的是满足条件的自然，从0开始
+        # torch.nonzero返回的是满足条件的自然索引，从0开始
+        # 但是torch.nonzero返回的shape是(M,1)，需要reshape(-1)
         inds = torch.nonzero(anchor_iou <= iou_threshold).reshape(-1)
         # 转换为总绝对索引
         inds = inds + 1
