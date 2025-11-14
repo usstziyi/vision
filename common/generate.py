@@ -1,3 +1,5 @@
+import torch
+
 '''
     根据输入图像尺寸、缩放比例列表、宽高比列表生成多个锚框
 '''
@@ -36,8 +38,8 @@ def generate_anchors(data, scales, ratios):
     # 根据缩放长宽比生成的锚框的像素长宽
     # anchors_width(num_anchors_per_pixel,)
     # anchors_height(num_anchors_per_pixel,)
-    anchors_width = torch.cat((data_relative_height * scales_tensor * torch.sqrt(ratios_tensor[0]), data_relative_height * scales_tensor[0] * torch.sqrt(ratios_tensor[1:])))
-    anchors_height = torch.cat((data_relative_height * scales_tensor / torch.sqrt(ratios_tensor[0]), data_relative_height * scales_tensor[0] / torch.sqrt(ratios_tensor[1:])))
+    anchors_width = torch.cat((data_height * scales_tensor * torch.sqrt(ratios_tensor[0]), data_height * scales_tensor[0] * torch.sqrt(ratios_tensor[1:])))
+    anchors_height = torch.cat((data_height * scales_tensor / torch.sqrt(ratios_tensor[0]), data_height * scales_tensor[0] / torch.sqrt(ratios_tensor[1:])))
 
 
 
