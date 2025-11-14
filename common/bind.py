@@ -81,4 +81,7 @@ def bind_ground_truth_to_anchor(ground_truth, anchors, device, iou_threshold=0.5
     # 经过两轮的bind,anchors_gt_map中每个gt都被分配到了anchor
     # 但是还有的anchor没有被分配到gt,这些anchor的索引在anchors_gt_map中为-1
     # 输出(NAC,)
+    # NAC个anchor中:
+    # 1. 正样本anchor都有一个对应的gt索引:0,1,...
+    # 2. 负样本anchor没有对应的gt索引:-1
     return anchors_gt_map
