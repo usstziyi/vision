@@ -1,6 +1,8 @@
 
 
-# 求锚框和真实边界框的偏移量
+'''
+    anchors到target_anchors的偏移量
+'''
 # anchors(NAC,4):(xmin, ymin, xmax, ymax)
 # target_anchors(NAC,4):(xmin, ymin, xmax, ymax)
 def offset_anchors(anchors, target_anchors, eps=1e-6):
@@ -29,24 +31,25 @@ def offset_anchors(anchors, target_anchors, eps=1e-6):
 
 
 
-
-# 把偏移量施加到锚框上，得到预测框
+'''
+    把偏移量施加到锚框上，得到预测框
+'''
 # anchor(NAC,4):(xmin,ymin,xmax,ymax)
 # offset(NAC,4):(tx,ty,tw,th)
 def offset_inverse(anchors, offset):
-    """根据带有预测偏移量的锚框来预测边界框"""
     # anchors(NAC,4):(xmin,ymin,xmax,ymax)
     # c_anchors(NAC,4):(x,y,w,h)
     c_anchors = d2l.box_corner_to_center(anchors)
     
     # c_target_anchor_xy(NAC,2):(x,y):施加偏移量后的物理坐标
-    c_target_anchor_xy = (offset[:, :2] * c_anchors[:, 2:] / 10) + c_anchors[:, :2]
     # c_target_anchor_wh(NAC,2):(w,h):施加偏移量后的物理尺寸
-    c_target_anchor_wh = torch.exp(offset[:, 2:] / 5) * c_anchors[:, 2:]
-
     # c_target_anchor(NAC,4):(x,y,w,h)
+    c_target_anchor_xy = (offset[:, :2] * c_anchors[:, 2:] / 10) + c_anchors[:, :2]
+    c_target_anchor_wh = torch.exp(offset[:, 2:] / 5) * c_anchors[:, 2:]
     c_target_anchor = torch.cat((c_target_anchor_xy, c_target_anchor_wh), axis=1)
+
+
     # target_anchor(NAC,4):(xmin,ymin,xmax,ymax)
     target_anchor = d2l.box_center_to_corner(c_target_anchor)
-    # target_anchor(NAC,4):(xmin,ymin,xmax,ymax)
+    
     return target_anchor
