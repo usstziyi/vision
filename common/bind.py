@@ -3,6 +3,9 @@ from .iou import iou
 
 '''
     绑定gt到ac,确保每个gt都被分配到anchor
+    NAC个anchor中:
+    1. 正样本anchor都有一个对应的gt索引:0,1,...
+    2. 负样本anchor没有对应的gt索引:-1
 '''
 
 # ground_truth(NGT,4):(xmin,ymin,xmax,ymax)
