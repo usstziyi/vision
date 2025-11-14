@@ -91,8 +91,8 @@ def generate_anchors(data, scales, ratios):
     # 锚框的相对长宽
     # anchors_relative_width(num_anchors_per_pixel,)
     # anchors_relative_height(num_anchors_per_pixel,)
-    anchors_relative_width = anchors_width / data_relative_width
-    anchors_relative_height = anchors_height / data_relative_height
+    anchors_relative_width = anchors_width / data_width
+    anchors_relative_height = anchors_height / data_height
 
 
     # anchors_relative_whwh(num_anchors_per_pixel, 4)
@@ -105,7 +105,7 @@ def generate_anchors(data, scales, ratios):
     # center_relative_xyxy          (num_anchors_per_pixel*h*w, 4)
     # anchors_relative_whwh         (num_anchors_per_pixel*h*w, 4)
     # anchors_relative              (num_anchors_per_pixel*h*w, 4)
-    # (左上角x, 左上角y, 右下角x, 右下角y)
+    # (xmin, ymin, xmax, ymax)
     anchors_relative = center_relative_xyxy + anchors_relative_whwh
     # 输出：(1, bpp*h*w, 4)
     return anchors_relative.unsqueeze(0)

@@ -17,6 +17,9 @@ def main():
     Y = generate_anchors(data, scales, ratios)
     print(Y.shape)
 
+    anchors = Y.reshape(h,w,5,4)
+    print(anchors[250,250,0,:])
+
 
 if __name__ == '__main__':
     main()
