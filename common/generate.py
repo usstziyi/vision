@@ -18,6 +18,8 @@ def generate_anchors(data, scales, ratios):
     # ratios_tensor(num_ratios,):(r1,r2,...,rm)
     scales_tensor = torch.tensor(scales, device=device)
     ratios_tensor = torch.tensor(ratios, device=device)
+    # 每个像素中心生成的锚框数量
+    num_anchors_per_pixel = (num_scales + num_ratios - 1)
 
     # 一、像素坐标系：物理坐标系
     # .----->x
@@ -69,7 +71,6 @@ def generate_anchors(data, scales, ratios):
 
     # 根据函数参数，每个中心点都生成“boxes_per_pixel”个锚框
     # num_anchors_per_pixel = num_scales + num_ratios - 1
-    num_anchors_per_pixel = (num_scales + num_ratios - 1)
     # []负责传递参数，不增加维度
     # [mesh_x] [mesh_y] [mesh_x] [mesh_y]
     # [mesh_x] [mesh_y] [mesh_x] [mesh_y]
