@@ -6,6 +6,7 @@ from .show_anchors import show_anchors
 from .iou import iou 
 from .nms import nms
 from .bind import bind_ground_truth_to_anchor
+from .pre import multibox_detection
 
 
 __all__ = [
@@ -16,5 +17,6 @@ __all__ = [
     'show_anchors',
     'iou',
     'nms',
-    'bind_ground_truth_to_anchor'
+    'bind_ground_truth_to_anchor',
+    'multibox_detection'
 ]

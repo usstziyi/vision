@@ -32,7 +32,6 @@ def main():
     # 为每个锚框添加标签，方便观察不同尺度和比例的锚框效果
     labels = ['s=0.75, r=1', 's=0.5, r=1', 's=0.25, r=1', 's=0.75, r=2', 's=0.75, r=0.5']
     show_anchors(fig.axes, anchors_pixel[250, 250, :, :], labels)
-    plt.title('(250,250)')
     plt.show()
 
 

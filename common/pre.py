@@ -43,7 +43,7 @@ def multibox_detection(cls_probs,       # cls_probs(1, NCLS, NAC)
         # offset_pred(NAC, 4)
         # target_anchors(NAC, 4)
         target_anchors = offset_inverse(anchors, offset_pred)
-        # 非极大值抑制
+        # 非极大值抑制：确保了最终输出结果既没有冗余重叠框
         # keep(K,):保留的anchor索引
         keep = nms(target_anchors, scores, nms_threshold)  
 
@@ -71,6 +71,10 @@ def multibox_detection(cls_probs,       # cls_probs(1, NCLS, NAC)
         scores = scores[all_id_sorted] 
         predicted_bb = target_anchors[all_id_sorted] 
         
+
+        # NMS可能保留了一些置信度不高但不与其他框重叠的预测框
+        # 这些低置信度预测很可能是误检，需要进一步过滤
+        # 再次筛选，将置信度低于阈值的预测框类别设为-1
         # pos_threshold是一个用于非背景预测的阈值
         below_min_idx = (scores < pos_threshold)
         class_id[below_min_idx] = -1
@@ -80,10 +84,8 @@ def multibox_detection(cls_probs,       # cls_probs(1, NCLS, NAC)
         # class_id(NAC,1)
         # scores(NAC,1)
         # predicted_bb(NAC, 4)
-        # pred_info(NAC, 6)
-        pred_info = torch.cat((class_id.unsqueeze(1),
-                               scores.unsqueeze(1),             
-                               predicted_bb), dim=1)
+        # pred_info(NAC, 6):(class_id, scores, predicted_bb)
+        pred_info = torch.cat((class_id.unsqueeze(1), scores.unsqueeze(1), predicted_bb), dim=1)
         out.append(pred_info)
         # out(1, NAC, 6)
     return torch.stack(out)

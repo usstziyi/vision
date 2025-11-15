@@ -43,7 +43,7 @@ def nms(anchors, scores, iou_threshold):
         # 转换为总绝对索引
         inds = inds + 1
         # 下一轮参与NMS的框索引(一直沿用原始索引)
-        anchor_inds = rest_anchor_inds[inds]
+        anchor_inds = anchor_inds[inds]
     # keep(k,): 最终保留的框索引(原始索引)
     keep = torch.tensor(keep, device=anchors.device)
     return keep
