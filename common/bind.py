@@ -2,10 +2,18 @@ import torch
 from .iou import iou
 
 '''
+    正负样本分配:其目的是决定哪些锚框负责预测哪个目标，并用于后续的损失计算和训练。
     绑定gt到ac,确保每个gt都被分配到anchor
     NAC个anchor中:
     1. 正样本anchor都有一个对应的gt索引:0,1,...
     2. 负样本anchor没有对应的gt索引:-1
+
+    我们需要回答两个问题：
+    哪些锚框是“正样本”（负责预测某个 GT）？
+    哪些锚框是“负样本”（背景，不包含目标）？
+
+    第一阶段：基于 IoU 阈值的正样本分配
+    第二阶段：确保每个 GT 至少有一个 anchor（贪心匹配）
 '''
 
 # ground_truth(NGT,4):(xmin,ymin,xmax,ymax)
@@ -72,12 +80,12 @@ def bind_ground_truth_to_anchor(ground_truth, anchors, device, iou_threshold=0.5
         # 这是为了防止某些小目标或特殊形状的目标完全“漏掉”，没有锚框负责预测它，从而导致训练时无法学习到这些目标。
         # 因此，第二次映射覆盖第一次的结果，是合理的策略调整，目的是提升召回率（recall）。
         # 建立锚框索引(行索引)与真实边界框索引(列索引)的映射关系
-        anchors_gt_map[ac_id] = gt_id
+        anchors_gt_map[ac_id] = gt_id # 覆盖第一次映射的结果,强制绑定
 
         # 执行纵向擦除
-        anchors_iou[:, gt_id] = col_discard
+        anchors_iou[:, gt_id] = col_discard # 删除该gt列,该gt已被绑定
         # 执行横向擦除
-        anchors_iou[ac_id, :] = row_discard
+        anchors_iou[ac_id, :] = row_discard # 删除该ac行,该ac已被绑定
     # 经过两轮的bind,anchors_gt_map中每个gt都被分配到了anchor
     # 但是还有的anchor没有被分配到gt,这些anchor的索引在anchors_gt_map中为-1
     # 输出(NAC,)
