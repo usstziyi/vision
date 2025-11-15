@@ -39,13 +39,12 @@ def nms(anchors, scores, iou_threshold):
         # 此时anchor_iou并不是从大到小顺序序列
         anchor_iou = iou(max_score_anchor, rest_anchors).reshape(-1)
         # 筛选出 IoU 小于阈值的框自然索引,保留，删除太相似的anchor
-        # inds: (M,)  保留的索引，M <= N-1
-        # torch.nonzero返回的是满足条件的自然索引，从0开始
-        # 但是torch.nonzero返回的shape是(M,1)，需要reshape(-1)
-        inds = torch.nonzero(anchor_iou <= iou_threshold).reshape(-1)
-        # ins+1:0号是当前最高置信框
+        # mask(R,)
+        mask = anchor_iou <= iou_threshold
+        # 跳过第一个框，因为它是当前最高置信框
         # 更逊anchor索引：去掉本轮最大置信框和相似框，保留其他框，用于下一轮计算
-        anchor_inds = anchor_inds[inds+1]
+        # anchor_inds: (R,)
+        anchor_inds = anchor_inds[1:][mask]
     # keep(k,): 最终保留的框索引(原始索引)
     keep = torch.tensor(keep, device=anchors.device)
     return keep
