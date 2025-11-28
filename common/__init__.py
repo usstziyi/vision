@@ -7,6 +7,7 @@ from .iou import iou
 from .nms import nms
 from .bind import bind_ground_truth_to_anchor
 from .pre import multibox_detection
+from .generate_fmap_anchors import generate_fmap_anchors
 
 
 __all__ = [
@@ -18,5 +19,6 @@ __all__ = [
     'iou',
     'nms',
     'bind_ground_truth_to_anchor',
-    'multibox_detection'
+    'multibox_detection',
+    'generate_fmap_anchors'
 ]

@@ -18,12 +18,16 @@ def main():
     Y = generate_anchors(data, scales, ratios)
     print(Y.shape)
 
-    anchors = Y.reshape(h,w,5,4)
+    num_anchors = len(scales) + len(ratios) - 1
+    print(num_anchors)
+
+    anchors = Y.reshape(h,w,num_anchors,4)
     print(anchors[250,250,:,:])
 
 
     # 将锚框从相对坐标转换为像素坐标
     print(data.shape)
+    # anchors(NAC,4):(xmin, ymin, xmax, ymax)
     anchors_pixel = relative_to_pixel(anchors, data.shape)
     print(anchors_pixel[250, 250, :, :])
 
