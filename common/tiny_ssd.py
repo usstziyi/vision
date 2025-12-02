@@ -112,7 +112,7 @@ class TinySSD(nn.Module):
 
     def forward(self, X):
         anchors, cls_preds, bbox_preds = [None] * 5, [None] * 5, [None] * 5
-        print(X.shape)
+        # print(X.shape)
         # 1.执行网络(blk,cls,bbox)
         for i in range(5):
             # X：处理后的特征图
@@ -120,7 +120,7 @@ class TinySSD(nn.Module):
             # cls_preds[i](B,C,H,W)：每个锚框的类别预测
             # bbox_preds[i](B,C,H,W)：每个锚框的边界框预测
             X, anchors[i], cls_preds[i], bbox_preds[i] = blk_forward(X, getattr(self, f'blk_{i}'), sizes[i], ratios[i], getattr(self, f'cls_{i}'), getattr(self, f'bbox_{i}'))
-            print(X.shape)
+            # print(X.shape)
             
         # 2.执行拼接
         # anchors(1,(H*W+...)*num_anchors,4)：生成的锚框

@@ -9,6 +9,8 @@ from .bind import bind_ground_truth_to_anchor
 from .pre import multibox_detection
 from .generate_fmap_anchors import generate_fmap_anchors
 from .tiny_ssd import TinySSD
+from .displaymodel import display_model 
+
 
 
 __all__ = [
@@ -22,5 +24,6 @@ __all__ = [
     'bind_ground_truth_to_anchor',
     'multibox_detection',
     'generate_fmap_anchors',
-    'TinySSD'
+    'TinySSD',
+    'display_model'
 ]
