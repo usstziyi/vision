@@ -8,6 +8,7 @@ from .nms import nms
 from .bind import bind_ground_truth_to_anchor
 from .pre import multibox_detection
 from .generate_fmap_anchors import generate_fmap_anchors
+from .tiny_ssd import TinySSD
 
 
 __all__ = [
@@ -20,5 +21,6 @@ __all__ = [
     'nms',
     'bind_ground_truth_to_anchor',
     'multibox_detection',
-    'generate_fmap_anchors'
+    'generate_fmap_anchors',
+    'TinySSD'
 ]
