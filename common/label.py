@@ -68,7 +68,7 @@ def anchors_label(anchors, labels):
 
     # offset(4*NAC,):(tx1,ty1,tw1, th1, tx2, ty2, tw2, th2, ...)
     # positive_mask(4*NAC,):(1,1,1,1,0,0,0,0,1,1,1,1,...)
-    # anchors_label(4*NAC,):(c1,c2,c3,0,0,0,c4,c5,...)
+    # anchors_label(NAC,):(c1,c2,c3,c4,c5,...)
     offset = offset.reshape(-1)
     positive_mask = positive_mask.reshape(-1)
     anchors_label = anchors_label.reshape(-1)
