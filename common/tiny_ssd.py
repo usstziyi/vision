@@ -69,11 +69,14 @@ def get_blk(i):
     return blk
 
 
+# tiny_ssd网络
 def blk_forward(X, blk, sizes, ratios, cls_predictor, bbox_predictor):
     # 1.blk:对上一层进行卷积，得到新的特征图
+    # 基础网络块/多尺度特征块
     # X(B,C,H,W) -> Y(B,C,H,W)
     Y = blk(X)
     # 2.anchors:基于新的特征图生成锚框
+    # 生成锚框
     # anchors(1,bpp*H*W,4)：生成的锚框
     # anchors 是预先定义的候选框，它们不依赖于具体的输入图像内容，
     # 只依赖于特征图的尺寸和预设的尺度/比例
@@ -81,9 +84,11 @@ def blk_forward(X, blk, sizes, ratios, cls_predictor, bbox_predictor):
     # 尽管 anchors 的第一个维度是1，但在后续的处理中它会被广播应用到批次中的每个样本
     anchors = d2l.multibox_prior(Y, sizes, ratios)
     # 3.cls:基于新的特征图生成类别预测
+    # 类别预测      
     # cls_preds(B,C,H,W)，C = num_anchors * (num_classes + 1)
     cls_preds = cls_predictor(Y)
     # 4.bbox:基于新的特征图生成边界框预测
+    # 边界框预测
     # bbox_preds(B,C,H,W)，C = num_anchors * 4
     bbox_preds = bbox_predictor(Y)
 
