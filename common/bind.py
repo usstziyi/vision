@@ -92,4 +92,5 @@ def bind_ground_truth_to_anchor(ground_truth, anchors, device, iou_threshold=0.5
     # NAC个anchor中:
     # 1. 正样本anchor都有一个对应的gt索引:0,1,...
     # 2. 负样本anchor没有对应的gt索引:-1
+    # anchors_gt_map(NAC,):-1表示anchor未bind到gt,anchor是负样本
     return anchors_gt_map

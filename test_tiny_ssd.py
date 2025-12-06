@@ -6,17 +6,18 @@ from d2l import torch as d2l
 from common import TinySSD
 from common import display_model
 
-# anchor: (1,bpp*H*W,4)
+# anchors   (1,(H*W+...)*num_anchors,4):锚框生成器
 # labels: (B,1,5)
 def multibox_target(anchors, labels):
-    """Label anchor boxes using ground-truth bounding boxes.
-
-    Defined in :numref:`subsec_labeling-anchor-boxes`"""
-    batch_size, anchors = labels.shape[0], anchors.squeeze(0)
+    device = anchors.device
     batch_offset, batch_mask, batch_class_labels = [], [], []
-    device, num_anchors = anchors.device, anchors.shape[0]
+    # anchors: (NAC,4):相当于一个网格模板，每个样本的锚框都是使用这个模板
+    anchors = anchors.squeeze(0)
+    num_anchors = anchors.shape[0]
+    batch_size = labels.shape[0]
     for i in range(batch_size):
         label = labels[i, :, :]
+        # anchors_bbox_map(NAC,):-1表示anchor未bind到gt,anchor是负样本
         anchors_bbox_map = assign_anchor_to_bbox(label[:, 1:], anchors, device)
         bbox_mask = ((anchors_bbox_map >= 0).float().unsqueeze(-1)).repeat(1, 4)
         # Initialize class labels and assigned bounding box coordinates with
@@ -97,7 +98,7 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
             # Y: torch.Size([32, 1, 5])
             X, Y = features.to(device), target.to(device)
             # 生成多尺度的锚框，为每个锚框预测类别和偏移量
-            # anchors   (1,(H*W+...)*num_anchors,4)
+            # anchors   (1,(H*W+...)*num_anchors,4):锚框生成器
             # cls_preds (B,(H*W+...)*num_anchors,num_classes+1)
             # bbox_preds(B,(H*W+...)*num_anchors*4)
             anchors, cls_preds, bbox_preds = net(X)
