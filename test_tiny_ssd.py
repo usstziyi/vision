@@ -70,7 +70,7 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
     optimizer = torch.optim.SGD(net.parameters(), lr=0.2, weight_decay=5e-4)
 
 
-    # anchors   (1,(H*W+...)*num_anchors,4)
+
     # cls_preds (B,(H*W+...)*num_anchors,num_classes+1)
     # bbox_preds(B,(H*W+...)*num_anchors*4)
     def calc_loss(cls_preds, cls_labels, bbox_preds, bbox_labels, bbox_masks):
