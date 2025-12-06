@@ -31,6 +31,7 @@ def base_net():
 
 
 # 类别预测层：每个锚框预测num_classes+1个类别（包括背景）
+# 对特征图中每个位置进行类别预测
 # return(B,C,H,W)
 # C = num_anchors * (num_classes + 1)
 def cls_predictor(num_inputs, num_anchors, num_classes):
@@ -103,6 +104,15 @@ sizes = [[0.2, 0.272], [0.37, 0.447], [0.54, 0.619], [0.71, 0.79], [0.88, 0.961]
 ratios = [[1, 2, 0.5], [1, 2, 0.5], [1, 2, 0.5], [1, 2, 0.5], [1, 2, 0.5]]
 num_anchors = len(sizes[0]) + len(ratios[0]) - 1 # 2 + 3 - 1 = 4
 
+
+'''
+目标检测算法与图片画面信息的关联是通过以下方式实现的：
+1. 空间映射 ：特征图上的每个位置都对应原图的一个区域
+2. 锚框机制 ：在特征图每个位置生成多个锚框，覆盖不同尺度和比例
+3. 端到端学习 ：网络直接从图像像素学习到物体类别和位置的映射关系
+4. 坐标变换 ：通过数学变换将特征图坐标、锚框参数与原图坐标建立联系
+这种设计使得网络能够理解图像内容，并准确地定位和识别图像中的物体。
+'''
 class TinySSD(nn.Module):
     def __init__(self, num_classes, **kwargs):
         super(TinySSD, self).__init__(**kwargs)
