@@ -77,8 +77,10 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
         # cls_preds (B,(H*W+...)*num_anchors,num_classes+1)
         batch_size, num_classes = cls_preds.shape[0], cls_preds.shape[2]
         # B*(H*W+...)*num_anchors->(B,(H*W+...)*num_anchors)->(B)
+        # 对于批次中的每个样本，计算其所有锚框的分类损失的平均值
         cls = cls_loss(cls_preds.reshape(-1, num_classes), cls_labels.reshape(-1)).reshape(batch_size, -1).mean(dim=1)
         # (B,(H*W+...)*num_anchors*4)->(B)
+        # 对于批次中的每个样本，计算其所有锚框的回归损失的平均值
         bbox = bbox_loss(bbox_preds * bbox_masks, bbox_labels * bbox_masks).mean(dim=1)
         # (B)
         return cls + bbox
@@ -101,6 +103,7 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
             # anchors   (1,(H*W+...)*num_anchors,4):锚框生成器
             # cls_preds (B,(H*W+...)*num_anchors,num_classes+1)
             # bbox_preds(B,(H*W+...)*num_anchors*4)
+            # features:分类、边框偏移量
             anchors, cls_preds, bbox_preds = net(X)
             # 为每个锚框标注类别和偏移量
             # anchors   (1,(H*W+...)*num_anchors,4)
@@ -108,6 +111,7 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
             # bbox_labels(B,(H*W+...)*num_anchors*4)
             # bbox_masks(B,(H*W+...)*num_anchors*4)
             # cls_labels(B,(H*W+...)*num_anchors)
+            # labels：分类，边框偏移量
             bbox_labels, bbox_masks, cls_labels = d2l.multibox_target(anchors, Y)
             # 根据类别和偏移量的预测和标注值计算损失函数
             l = calc_loss(cls_preds, cls_labels, bbox_preds, bbox_labels, bbox_masks)
