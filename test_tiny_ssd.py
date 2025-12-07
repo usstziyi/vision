@@ -152,6 +152,8 @@ def predict_tinyssd(X):
     # anchors   (1,(H*W+...)*num_anchors,4)
     # cls_preds (B,(H*W+...)*num_anchors,num_classes+1)：包括背景0的原始得分
     # bbox_preds(B,(H*W+...)*num_anchors*4)
+    # cls_preds:卷积层输出的原始得分，存储在8个通道中，每个通道对应一个锚框的类别预测
+    # bbox_preds:卷积层输出的边界框预测，存储在16个通道中，每个通道对应一个锚框的边界框预测
     anchors, cls_preds, bbox_preds = net(X.to(device))
     print('-----')
     print(anchors.shape)

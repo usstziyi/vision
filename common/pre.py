@@ -108,5 +108,7 @@ def multibox_detection(cls_probs,       # cls_probs(B, NCLS, NAC)：每个锚框
         # pred_info(NAC, 6):(class_id, scores, predicted_bb)
         pred_info = torch.cat((class_id.unsqueeze(1), scores.unsqueeze(1), predicted_bb), dim=1)
         out.append(pred_info)
-        # out(1, NAC, 6)
+        # out(B, NAC, 6)
+        # 调用 torch.stack(out) 时不指定 dim 参数，
+        # 函数会沿着第 0 维（第一个维度）创建一个新的维度来堆叠输入张量序列
     return torch.stack(out)

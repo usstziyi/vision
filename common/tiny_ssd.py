@@ -93,6 +93,9 @@ def blk_forward(X, blk, sizes, ratios, cls_predictor, bbox_predictor):
     # 3.cls:基于新的特征图生成类别预测
     # 类别预测      
     # cls_preds(B,C,H,W)，C = num_anchors * (num_classes + 1)
+    # 早期的特征图的卷积层学会检测小目标，后期的特征图的卷积层学会检测大目标
+    # 检测结果存储到8个通道中，每个通道对应一个锚框的类别预测
+    # 后期再通过反向传播更新参数
     cls_preds = cls_predictor(Y)
     # print(cls_preds.shape)
     # 每个位置的类别预测信息需要8个数据来存储
@@ -104,6 +107,9 @@ def blk_forward(X, blk, sizes, ratios, cls_predictor, bbox_predictor):
     # 4.bbox:基于新的特征图生成边界框预测
     # 边界框预测
     # bbox_preds(B,C,H,W)，C = num_anchors * 4
+    # 早期的特征图的卷积层学会检测小目标，后期的特征图的卷积层学会检测大目标
+    # 检测结果存储到16个通道中，每个通道对应一个锚框的边界框预测
+    # 后期再通过反向传播更新参数
     bbox_preds = bbox_predictor(Y)
     # print(bbox_preds.shape)
     # 每个位置的边界框预测信息需要16个数据来存储
