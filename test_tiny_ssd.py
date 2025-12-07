@@ -4,6 +4,7 @@ from torch import nn
 from torch.nn import functional as F
 from d2l import torch as d2l
 from common import TinySSD
+from common import multibox_detection
 from common import display_model
 
 # anchors   (1,(H*W+...)*num_anchors,4):锚框生成器
@@ -53,11 +54,16 @@ def multibox_target(anchors, labels):
 
 
 # 评估函数：类别
+# cls_preds  (B,(H*W+...)*num_anchors,num_classes+1)：每个锚框的类别概率
+# cls_labels (B,(H*W+...)*num_anchors)：每个锚框的真实类别标签
 def cls_eval(cls_preds, cls_labels):
     # 由于类别预测结果放在最后一维，argmax需要指定最后一维。
     # 分类正确的样本总数（不是准确率，而是正确个数）
     return float((cls_preds.argmax(dim=-1).type(cls_labels.dtype) == cls_labels).sum())
 # 评估函数：边界框
+# bbox_preds  (B,(H*W+...)*num_anchors*4)：每个锚框的预测边界框坐标
+# bbox_labels (B,(H*W+...)*num_anchors*4)：每个锚框的真实边界框坐标
+# bbox_masks  (B,(H*W+...)*num_anchors*4)：每个锚框的有效掩码（1表示有效，0表示无效）
 def bbox_eval(bbox_preds, bbox_labels, bbox_masks):
     # 所有有效边界框的 L1 误差总和（越小越好）
     return float((torch.abs((bbox_labels - bbox_preds) * bbox_masks)).sum())
@@ -128,6 +134,43 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
         print(f'epoch {epoch + 1}:' f'class err {cls_err:.2e}, bbox mae {bbox_mae:.2e}')
     print(f'{len(train_iter.dataset) / timer.stop():.1f} examples/sec on ' f'{str(device)}')
 
+'''
+功能 :
+- 将预测的边界框偏移量应用到锚框上，得到实际的预测框
+- 使用非极大值抑制(NMS)去除重复的检测框
+- 根据置信度阈值过滤低质量的预测结果
+- 返回最终的检测结果，包括类别、置信度和边界框坐标
+
+输出 :
+  - output : 形状为 (1, NAC, 6) 的张量，其中每一行包含：
+  - 第0列:类别ID(-1表示背景)
+  - 第1列:置信度分数
+  - 第2-5列:边界框坐标(x1, y1, x2, y2)
+'''
+def predict_tinyssd(X):
+    net.eval()
+    # anchors   (1,(H*W+...)*num_anchors,4)
+    # cls_preds (B,(H*W+...)*num_anchors,num_classes+1)：包括背景0的原始得分
+    # bbox_preds(B,(H*W+...)*num_anchors*4)
+    anchors, cls_preds, bbox_preds = net(X.to(device))
+    print('-----')
+    print(anchors.shape)
+    print(cls_preds.shape)
+    print(bbox_preds.shape)
+    print('-----')
+    # cls_probs(B,num_classes+1,(H*W+...)*num_anchors):(B,类别数,锚框数)
+    # cls_preds是原始得分
+    # cls_probs是归一化后的概率：包括背景0的类别概率
+    cls_probs = F.softmax(cls_preds, dim=2).permute(0, 2, 1)
+    print(cls_probs.shape)
+    # cls_probs(B,num_classes+1,(H*W+...)*num_anchors):(B,类别数,锚框数)
+    # bbox_preds(B,(H*W+...)*num_anchors*4)
+    # anchors(1,(H*W+...)*num_anchors,4)
+    # output(B,(H*W+...)*num_anchors,6)
+    # cls_probs是归一化后的概率：包括背景0的类别概率
+    output = multibox_detection(cls_probs, bbox_preds, anchors)
+    idx = [i for i, row in enumerate(output[0]) if row[0] != -1]
+    return output[0, idx]
 
 def main():
     # 设置超参数
@@ -156,6 +199,12 @@ def main():
 
 
     # 评估模型
+    X = torchvision.io.read_image('../img/banana.jpg').unsqueeze(0).float()
+    print(X.shape)
+    img = X.squeeze(0).permute(1, 2, 0).long()
+    print(img.shape)
+    output = predict_tinyssd(X)
+    print(output.shape)
 
 if __name__ == '__main__':
     main()

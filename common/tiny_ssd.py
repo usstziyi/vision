@@ -84,14 +84,34 @@ def blk_forward(X, blk, sizes, ratios, cls_predictor, bbox_predictor):
     # 相当于一个锚框生成器
     # 尽管 anchors 的第一个维度是1，但在后续的处理中它会被广播应用到批次中的每个样本
     anchors = d2l.multibox_prior(Y, sizes, ratios)
+    # print(anchors.shape)
+    # torch.Size([1, 4096, 4]) # 第一层特征图：32x32,共生成4096个锚框
+    # torch.Size([1, 1024, 4]) # 第二层特征图：16x16,共生成1024个锚框
+    # torch.Size([1, 256, 4]) # 第三层特征图：8x8,共生成256个锚框
+    # torch.Size([1, 64, 4]) # 第四层特征图：4x4,共生成64个锚框
+    # torch.Size([1, 4, 4]) # 第五层特征图：1x1,共生成4个锚框
     # 3.cls:基于新的特征图生成类别预测
     # 类别预测      
     # cls_preds(B,C,H,W)，C = num_anchors * (num_classes + 1)
     cls_preds = cls_predictor(Y)
+    # print(cls_preds.shape)
+    # 每个位置的类别预测信息需要8个数据来存储
+    # torch.Size([32, 8, 32, 32]) # 第一层特征图：32x32
+    # torch.Size([32, 8, 16, 16]) # 第二层特征图：16x16
+    # torch.Size([32, 8, 8, 8]) # 第三层特征图：8x8
+    # torch.Size([32, 8, 4, 4]) # 第四层特征图：4x4
+    # torch.Size([32, 8, 1, 1]) # 第五层特征图：1x1
     # 4.bbox:基于新的特征图生成边界框预测
     # 边界框预测
     # bbox_preds(B,C,H,W)，C = num_anchors * 4
     bbox_preds = bbox_predictor(Y)
+    # print(bbox_preds.shape)
+    # 每个位置的边界框预测信息需要16个数据来存储
+    # torch.Size([32, 16, 32, 32]) # 第一层特征图：32x32
+    # torch.Size([32, 16, 16, 16]) # 第二层特征图：16x16
+    # torch.Size([32, 16, 8, 8]) # 第三层特征图：8x8
+    # torch.Size([32, 16, 4, 4]) # 第四层特征图：4x4
+    # torch.Size([32, 16, 1, 1]) # 第五层特征图：1x1
 
     # Y：处理后的特征图
     # anchors(1,bpp*H*W,4)：生成的锚框

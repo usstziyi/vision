@@ -10,6 +10,7 @@ from .pre import multibox_detection
 from .generate_fmap_anchors import generate_fmap_anchors
 from .tiny_ssd import TinySSD
 from .displaymodel import display_model 
+from .pre import multibox_detection
 
 
 
@@ -25,5 +26,6 @@ __all__ = [
     'multibox_detection',
     'generate_fmap_anchors',
     'TinySSD',
-    'display_model'
+    'display_model',
+    'multibox_detection'
 ]

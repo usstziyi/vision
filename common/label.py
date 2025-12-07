@@ -52,6 +52,7 @@ def anchors_label(anchors, labels):
     # 0-bg, 1-c1, 2-c2, ...
     # 因为label中的类别不包括背景类
     # 所以label中的类别要+1，和本第的规则匹配
+    # 剩下的锚框类别为背景类0
     anchors_label[positive_ac_id] = label[positive_gt_id].long() + 1
     # 填充真实边界框坐标(xmin,ymin,xmax,ymax)
     anchors_gt[positive_ac_id] = gts[positive_gt_id, :]   
