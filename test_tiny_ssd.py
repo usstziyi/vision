@@ -20,7 +20,7 @@ def multibox_target(anchors, labels):
     for i in range(batch_size):
         label = labels[i, :, :]
         # anchors_bbox_map(NAC,):-1表示anchor未bind到gt,anchor是负样本
-        anchors_bbox_map = assign_anchor_to_bbox(label[:, 1:], anchors, device)
+        anchors_bbox_map = assign_anchor_to_bbox(label[:, 1:], anchors, device) # 每个anchor绑定到的gt框的索引,feature就有了label
         bbox_mask = ((anchors_bbox_map >= 0).float().unsqueeze(-1)).repeat(1, 4)
         # Initialize class labels and assigned bounding box coordinates with
         # zeros
@@ -32,9 +32,12 @@ def multibox_target(anchors, labels):
         indices_true = torch.nonzero(anchors_bbox_map >= 0)
         bb_idx = anchors_bbox_map[indices_true]
         class_labels[indices_true] = label[bb_idx, 0].long() + 1
+        # indices_true 是有效锚框的索引（即与真实边界框成功匹配的锚框）
+        # 这一步完成了锚框与其对应的真实边界框之间的关联
         assigned_bb[indices_true] = label[bb_idx, 1:]
         # Offset transformation
         # offset: (NAC,4)
+        # 这行代码计算锚框与分配给它们的真实边界框之间的偏移量
         offset = offset_boxes(anchors, assigned_bb) * bbox_mask
         # offset: (NAC,4)->(NAC*4)
         batch_offset.append(offset.reshape(-1))
