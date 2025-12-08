@@ -58,15 +58,15 @@ def concat_preds(preds):
 # 5个块网络
 def get_blk(i):
     if i == 0:
-        blk = base_net()# 基础网络：三次 down_sample_blk：通道数分别为3,16,32,64
+        blk = base_net()                        # 三次down_sample_blk:通道数分别为3,16,32,64,宽高变小
     elif i == 1:
-        blk = down_sample_blk(64, 128) # 宽高减半块：通道数翻倍，宽、高减半
+        blk = down_sample_blk(64, 128)          # 一次down_sample_blk:通道数翻倍，宽、高减半
     elif i == 2:
-        blk = down_sample_blk(128, 128) # 宽高减半块：通道数不变，宽、高减半
+        blk = down_sample_blk(128, 128)         # 一次down_sample_blk:通道数不变，宽、高减半
     elif i == 3:
-        blk = down_sample_blk(128, 128) # 宽高减半块：通道数不变，宽、高减半
+        blk = down_sample_blk(128, 128)         # 一次down_sample_blk:通道数不变，宽、高减半
     elif i == 4:
-        blk = nn.AdaptiveMaxPool2d((1,1))# 全局最大池化层：不改变通道数，将特征图的高度和宽度都压缩为1，确保不管前面层输出的特征图尺寸如何，最终都能得到统一的1×1输出
+        blk = nn.AdaptiveMaxPool2d((1,1))       # 全局最大池化层：不改变通道数，将特征图的高度和宽度都压缩为1，确保不管前面层输出的特征图尺寸如何，最终都能得到统一的1×1输出
     return blk
 
 
