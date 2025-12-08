@@ -5,7 +5,8 @@ from torch.nn import functional as F
 from d2l import torch as d2l
 from common import TinySSD
 from common import multibox_detection
-from common import display_model
+from common import display
+import matplotlib.pyplot as plt
 
 # anchors   (1,(H*W+...)*num_anchors,4):锚框生成器
 # labels: (B,1,5)
@@ -118,6 +119,7 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
             # bbox_masks(B,(H*W+...)*num_anchors*4)
             # cls_labels(B,(H*W+...)*num_anchors)
             # labels：分类，边框偏移量
+            # 就近匹配：每个锚框分配一个真实边界框，计算偏移量和掩码，用于训练
             bbox_labels, bbox_masks, cls_labels = d2l.multibox_target(anchors, Y)
             # 根据类别和偏移量的预测和标注值计算损失函数
             l = calc_loss(cls_preds, cls_labels, bbox_preds, bbox_labels, bbox_masks)
@@ -147,32 +149,55 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
   - 第1列:置信度分数
   - 第2-5列:边界框坐标(x1, y1, x2, y2)
 '''
-def predict_tinyssd(X):
+# X(torch.Size([B=1, 3, 256, 256]))
+def predict_tinyssd(net, X, device):
     net.eval()
     # anchors   (1,(H*W+...)*num_anchors,4)
     # cls_preds (B,(H*W+...)*num_anchors,num_classes+1)：包括背景0的原始得分
     # bbox_preds(B,(H*W+...)*num_anchors*4)
     # cls_preds:卷积层输出的原始得分，存储在8个通道中，每个通道对应一个锚框的类别预测
     # bbox_preds:卷积层输出的边界框预测，存储在16个通道中，每个通道对应一个锚框的边界框预测
-    anchors, cls_preds, bbox_preds = net(X.to(device))
-    print('-----')
-    print(anchors.shape)
-    print(cls_preds.shape)
-    print(bbox_preds.shape)
-    print('-----')
-    # cls_probs(B,num_classes+1,(H*W+...)*num_anchors):(B,类别数,锚框数)
-    # cls_preds是原始得分
-    # cls_probs是归一化后的概率：包括背景0的类别概率
-    cls_probs = F.softmax(cls_preds, dim=2).permute(0, 2, 1)
-    print(cls_probs.shape)
-    # cls_probs(B,num_classes+1,(H*W+...)*num_anchors):(B,类别数,锚框数)
-    # bbox_preds(B,(H*W+...)*num_anchors*4)
-    # anchors(1,(H*W+...)*num_anchors,4)
-    # output(B,(H*W+...)*num_anchors,6)
-    # cls_probs是归一化后的概率：包括背景0的类别概率
-    output = multibox_detection(cls_probs, bbox_preds, anchors)
-    idx = [i for i, row in enumerate(output[0]) if row[0] != -1]
-    return output[0, idx]
+    with torch.no_grad():
+        anchors, cls_preds, bbox_preds = net(X.to(device))
+        print('-----')
+        print(anchors.shape)
+        print(cls_preds.shape)
+        print(bbox_preds.shape)
+        print('-----')
+        # cls_probs(B,num_classes+1,(H*W+...)*num_anchors):(B,类别数,锚框数)
+        # cls_preds是原始得分
+        # cls_probs是归一化后的概率：包括背景0的类别概率
+        cls_probs = F.softmax(cls_preds, dim=2).permute(0, 2, 1)
+        print(cls_probs.shape)
+        # cls_probs(B,num_classes+1,(H*W+...)*num_anchors):(B,类别数,锚框数)
+        # bbox_preds(B,(H*W+...)*num_anchors*4)
+        # anchors(1,(H*W+...)*num_anchors,4)
+        # output(B,(H*W+...)*num_anchors,6):6(class_id, scores, predicted_bb)
+        # cls_probs是归一化后的概率：包括背景0的类别概率
+        output = multibox_detection(cls_probs, bbox_preds, anchors)
+        # B=1
+        # output(B,(H*W+...)*num_anchors,6):6(class_id, scores, predicted_bb)
+        # output[0]:class_id(锚框总数,)
+        # idx:非背景锚框的索引列表
+        idx = [i for i, row in enumerate(output[0]) if row[0] != -1]
+        # 假设 output[0] 如下所示：
+        # (class_id, score, x1, y1, x2, y2)
+        # [
+        #     [-1, 0.95, 0.1, 0.1, 0.3, 0.3],    # 背景锚框
+        #     [0,  0.85, 0.2, 0.2, 0.4, 0.4],    # 类别0的锚框（如"狗"）
+        #     [-1, 0.92, 0.5, 0.5, 0.7, 0.7],    # 背景锚框
+        #     [1,  0.90, 0.6, 0.6, 0.8, 0.8]     # 类别1的锚框（如"猫"）
+        # ]
+        # 那么：
+        # idx = [1, 3] （索引1和3对应的class_id不为-1）
+        # output[0, idx] 结果为：
+        # [
+        #     [0,  0.85, 0.2, 0.2, 0.4, 0.4],    # 类别0的锚框
+        #     [1,  0.90, 0.6, 0.6, 0.8, 0.8]     # 类别1的锚框
+        # ]   
+        # output[0, idx] 表示从模型预测结果中提取出的第一个样本的所有有效（非背景）检测结果
+        # 这是pytorch的语法
+        return output[0, idx]
 
 def main():
     # 设置超参数
@@ -201,12 +226,20 @@ def main():
 
 
     # 评估模型
-    X = torchvision.io.read_image('../img/banana.jpg').unsqueeze(0).float()
+    print('-----')
+    print('评估模型')
+    X = torchvision.io.read_image('./img/banana.jpg').unsqueeze(0).float()
     print(X.shape)
+    # ouput(筛选出的锚框总数,6):6(class_id, scores, predicted_bb)
+    output = predict_tinyssd(net, X, device)
+    print(f'筛选出的锚框：{output.shape}')
+    
+    print(output)
+
+    # 可视化结果
     img = X.squeeze(0).permute(1, 2, 0).long()
-    print(img.shape)
-    output = predict_tinyssd(X)
-    print(output.shape)
+    display(img, output, threshold=0.9)
+
 
 if __name__ == '__main__':
     main()

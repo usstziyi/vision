@@ -183,7 +183,7 @@ class TinySSD(nn.Module):
         # anchors   (1,(H*W+...)*num_anchors,4)
         # cls_preds (B,(H*W+...)*num_anchors,num_classes+1)
         # bbox_preds(B,(H*W+...)*num_anchors*4)
-        return anchors, cls_preds, bbox_preds
+        return anchors, cls_preds, bbox_preds   
 
 
 

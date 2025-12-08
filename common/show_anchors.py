@@ -1,5 +1,6 @@
 import torch
 from d2l import torch as d2l
+import matplotlib.pyplot as plt
 
 '''
     显示某个像素为中心的所有边界框
@@ -20,7 +21,7 @@ def show_anchors(axes, anchors, labels=None, colors=None):
     # anchors(NAC,4):(xmin, ymin, xmax, ymax)
     for i, bbox in enumerate(anchors):
         color = colors[i % len(colors)] # 循环使用颜色列表
-        rect = d2l.bbox_to_rect(bbox.detach().numpy(), color)
+        rect = d2l.bbox_to_rect(bbox.detach().cpu().numpy(), color)
         axes.add_patch(rect)
         # 每个边界框上添加标签文本
         if labels and len(labels) > i:
@@ -35,3 +36,22 @@ def show_anchors(axes, anchors, labels=None, colors=None):
                       # facecolor=color ：设置背景框的填充颜色，使用与边界框相同的颜色
                       # lw=0 ：设置背景框边框的线宽为0，即不显示边框
                       bbox=dict(facecolor=color, lw=0))
+
+
+def display(img, output, threshold):
+    d2l.set_figsize((5, 5))
+    fig = plt.imshow(img)
+    
+    anchors = []
+    labels = [] 
+    for row in output:
+        score = float(row[1])
+        if score < threshold:
+            continue
+        h, w = img.shape[0:2]
+        anchor = row[2:6] * torch.tensor((w, h, w, h), device=row.device)
+        anchors.append(anchor)
+        #'%.2f' % score 是Python中的字符串格式化语法，将浮点数格式化为保留两位小数的字符串
+        labels.append('%.2f' % score)
+    show_anchors(fig.axes, anchors, labels)
+    plt.show()  

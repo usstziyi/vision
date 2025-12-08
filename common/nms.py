@@ -6,14 +6,14 @@ from .iou import iou
 '''
 
 
-# anchors: (NAC, 4)  N个边界框，每个框4个坐标
-# scores: (NAC,)   每个边界框的置信度得分
+# anchors: (NAC, 4)  N个边界框，每个框4个坐标:模型预测的目标锚框(相对尺寸)
+# scores: (NAC,)   每个边界框的置信度得分:模型预测的目标锚框的最大类别概率
 # iou_threshold: 抑制阈值
 def nms(anchors, scores, iou_threshold):
     # 对预测边界框的置信度进行排序
     # anchor_inds: (N,)  按置信度降序排列的索引:原始索引
     anchor_inds = torch.argsort(scores, dim=-1, descending=True)  
-    keep = []  # 保留预测边界框的指标
+    keep = []  # 保留预测边界框的原始索引
 
     # NMS
     while anchor_inds.numel() > 0:# 当待处理框数量大于0时，继续处理
@@ -42,7 +42,7 @@ def nms(anchors, scores, iou_threshold):
         # mask(R,)
         mask = anchor_iou <= iou_threshold
         # 跳过第一个框，因为它是当前最高置信框
-        # 更逊anchor索引：去掉本轮最大置信框和相似框，保留其他框，用于下一轮计算
+        # 更新anchor索引：去掉本轮最大置信框和相似框，保留其他框，用于下一轮计算
         # anchor_inds: (R,)
         anchor_inds = anchor_inds[1:][mask]
     # keep(k,): 最终保留的框索引(原始索引)

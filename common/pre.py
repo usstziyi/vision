@@ -11,10 +11,10 @@ from .nms import nms
     - 其余990个锚框与猫无重叠(标记为类别0,即背景)
     - 在NMS后,一些低置信度的预测被标记为-1(忽略):这些锚框不是背景，是被丢弃的低质量前景
 """
-
-def multibox_detection(cls_probs,       # cls_probs(B, NCLS, NAC)：每个锚框的类别概率,包括背景0类别的概率
+# 用于测试阶段
+def multibox_detection(cls_probs,       # cls_probs(B, NCLS, 锚框总数)：每个锚框的类别概率,包括背景0类别的概率
                        offset_preds,    # offset_preds(B, NAC*4)：每个锚框的偏移量预测
-                       anchors,         # anchors(1, NAC, 4):锚框生成器
+                       anchors,         # anchors(1, 锚框总数, 4):锚框生成器
                        nms_threshold=0.5,      # 非极大值抑制的IoU阈值，高于此阈值的重复框会被抑制
                        pos_threshold=0.009999999):  # 正类置信度阈值，低于此值的预测会被视为背景
     
@@ -22,7 +22,7 @@ def multibox_detection(cls_probs,       # cls_probs(B, NCLS, NAC)：每个锚框
 
     batch_size = cls_probs.shape[0]
     num_classes = cls_probs.shape[1]
-    num_anchors = cls_probs.shape[2]
+    num_anchors = cls_probs.shape[2] # 锚框总数
 
     # anchors(1, NAC, 4) -> anchors(NAC, 4)
     anchors = anchors.squeeze(0)
@@ -31,12 +31,8 @@ def multibox_detection(cls_probs,       # cls_probs(B, NCLS, NAC)：每个锚框
 
     out = []
     for i in range(batch_size):
-        # cls_prob(NCLS, NAC)
-        # offset_preds[i](NAC*4)
-        # reshape(-1, 4):(NAC, 4)
-        # offset_pred(NAC, 4)
+        # cls_prob(NCLS, 锚框总数)
         cls_prob = cls_probs[i]
-        offset_pred = offset_preds[i].reshape(-1, 4)
         # cls_prob[0]  通常表示背景类的概率
         # cls_prob[1:] 表示除了前景的所有类别概率
         # torch.max dim=0
@@ -52,19 +48,53 @@ def multibox_detection(cls_probs,       # cls_probs(B, NCLS, NAC)：每个锚框
         # - 确定是背景（低置信度）
         # - 不确定/忽略（通过NMS抑制或置信度过低设为-1）
         # 先判断是否有物体，再判断是什么物体
+        # 这里的class_id0对应前景，不是背景
+        # class_id 中的 0 对应 cls_prob[1] （第一个物体类别）
+        # class_id 中的 1 对应 cls_prob[2] （第二个物体类别）
+        # 举例：假设我们有3个物体类别：背景、狗、猫
+        # 更符合实际情况的类别概率分布
+        # cls_prob = torch.tensor([
+        #     [0.9,  0.2,  0.1,  0.05],  # 背景类概率 (通常较高)
+        #     [0.05, 0.7,  0.2,  0.03],  # 猫类概率
+        #     [0.05, 0.1,  0.7,  0.92]   # 狗类概率
+        # ])
+        # cls_prob[1:] 切片后：
+        # [
+        #     [0.05, 0.7,  0.2,  0.03],  # 猫类概率
+        #     [0.05, 0.1,  0.7,  0.92]   # 狗类概率
+        # ]
+        # torch.max 结果：
+        # scores = [0.05, 0.7, 0.7, 0.92]  # 每个锚框的最大物体类别概率
+        # class_id = [0, 0, 1, 1]           # 对应的类别索引（相对于切片后）
+        # 实际类别映射：
+        # 锚框0: 最可能是猫(类别1)，置信度0.05
+        # 锚框1: 最可能是猫(类别1)，置信度0.7
+        # 锚框2: 最可能是狗(类别2)，置信度0.7
+        # 锚框3: 最可能是狗(类别2)，置信度0.92
+        # 我们只关注前景类别的概率（索引1及以上）
+        # scores(锚框总数):模型预测的目标锚框的类别概率(最大)
+        # class_id(锚框总数):模型预测的目标锚框的类别索引
+        # 背景类不应该与物体类别竞争
+        # 后续处理 ：在后续代码中会有专门的逻辑处理背景情况：
         scores, class_id = torch.max(cls_prob[1:], dim=0)
+
+
+        # offset_preds[i](锚框总数*4)
+        # reshape(-1, 4):(锚框总数, 4)
+        # offset_pred(锚框总数, 4)
+        offset_pred = offset_preds[i].reshape(-1, 4)
         # 把偏移量施加到锚框上，得到预测框
-        # anchors(NAC, 4)
-        # offset_pred(NAC, 4)
-        # target_anchors(NAC, 4)
+        # anchors(锚框总数, 4)
+        # offset_pred(锚框总数, 4)
+        # target_anchors(锚框总数, 4):模型预测的目标锚框(相对尺寸)
+        # 把偏移量施加到锚框上，得到目标锚框(相对尺寸)
         target_anchors = offset_inverse(anchors, offset_pred)
 
 
-        # 非极大值抑制：确保了最终输出结果既没有冗余重叠框
-        # keep(K,):保留的anchor索引
-        # target_anchors(NAC,4)
-        # scores(NAC,):每个anchor的最大类别概率
-        # keep(K,):保留的anchor索引，K<=NAC
+        # 非极大值抑制：确保了最终输出结果没有冗余重叠框
+        # target_anchors(锚框总数,4):模型预测的目标锚框(相对尺寸)
+        # scores(锚框总数,):模型预测的目标锚框的最大类别概率
+        # keep(R,):保留的anchor索引，R<=锚框总数
         keep = nms(target_anchors, scores, nms_threshold)
 
         # 找到所有的non_keep索引，并将类设置为背景
@@ -79,9 +109,9 @@ def multibox_detection(cls_probs,       # cls_probs(B, NCLS, NAC)：每个锚框
         # non_keep(NAC-K,):所有不在keep中的anchor索引
         non_keep = uniques[counts == 1]
         # all_id_sorted(K+NAC-K,):保留的anchor索引+所有不在keep中的anchor索引
-        # 重新排列(keep,non_keep)
+        # 重新排列(keep,non_keep),keep+non_keep=所有anchor索引
         all_id_sorted = torch.cat((keep, non_keep))
-        # 不在keep中的anchor，类别索引下调到-1
+        # 不在keep中的anchor，类别索引下调到-1(背景类)
         class_id[non_keep] = -1
 
         # 按照排序(keep,non_keep)后的索引重新排列class_id数组
@@ -96,10 +126,10 @@ def multibox_detection(cls_probs,       # cls_probs(B, NCLS, NAC)：每个锚框
         # 这些低置信度预测很可能是误检，需要进一步过滤
         # 再次筛选，将置信度低于阈值的预测框类别设为-1
         # pos_threshold是一个用于非背景预测的阈值
+        # 当一个预测框被判定为背景时（因为置信度太低），我们用 1 - 原分数 来表示它作为背景的可能性
+        # 再次更新
         below_min_idx = (scores < pos_threshold)
         class_id[below_min_idx] = -1
-
-        # 当一个预测框被判定为背景时（因为置信度太低），我们用 1 - 原分数 来表示它作为背景的可能性
         scores[below_min_idx] = 1 - scores[below_min_idx]
 
         # class_id(NAC,1)
