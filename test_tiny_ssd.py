@@ -111,7 +111,7 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
             # cls_preds (B,(H*W+...)*num_anchors,num_classes+1)
             # bbox_preds(B,(H*W+...)*num_anchors*4)
             # features:分类、边框偏移量
-            anchors, cls_preds, bbox_preds = net(X)
+            anchors, cls_preds, bbox_preds = net(X)                                      # 模型算出锚框、分类、边框偏移量
             # 为每个锚框标注类别和偏移量
             # anchors   (1,(H*W+...)*num_anchors,4)
             # Y         (B,1,5)
@@ -120,9 +120,9 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
             # cls_labels(B,(H*W+...)*num_anchors)
             # labels：分类，边框偏移量
             # 就近匹配：每个锚框分配一个真实边界框，计算偏移量和掩码，用于训练
-            bbox_labels, bbox_masks, cls_labels = d2l.multibox_target(anchors, Y)
+            bbox_labels, bbox_masks, cls_labels = d2l.multibox_target(anchors, Y)        # 为每个锚框标注 类别和偏移量
             # 根据类别和偏移量的预测和标注值计算损失函数
-            l = calc_loss(cls_preds, cls_labels, bbox_preds, bbox_labels, bbox_masks)
+            l = calc_loss(cls_preds, cls_labels, bbox_preds, bbox_labels, bbox_masks)    # 计算损失函数
             # 使用 l.mean() 计算整个批次的平均损失
             l.mean().backward()
             optimizer.step()
