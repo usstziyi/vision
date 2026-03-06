@@ -1,10 +1,9 @@
 from .offset import offset_anchors
 from .offset import offset_inverse
-from .generate import generate_anchors
 from .ralative2pixel import relative_to_pixel
-from .show_anchors import show_anchors,display
 from .iou import iou 
 from .nms import nms
+from .show_boxes import show_boxes,display
 from .bind import bind_ground_truth_to_anchor
 from .pre import multibox_detection
 from .generate_fmap_anchors import generate_fmap_anchors
@@ -23,6 +22,7 @@ __all__ = [
     'show_anchors','display',
     'iou',
     'nms',
+    'show_boxes',
     'bind_ground_truth_to_anchor',
     'multibox_detection',
     'generate_fmap_anchors',

@@ -1,6 +1,5 @@
 from common import generate_anchors, show_anchors, relative_to_pixel
 import torch
-from d2l import torch as d2l
 import matplotlib.pyplot as plt
 
 torch.set_printoptions(2) 
