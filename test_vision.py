@@ -5,6 +5,14 @@ from common import generate_anchors, show_boxes, relative_to_pixel
 # 设置打印选项，保留两位小数
 torch.set_printoptions(2) 
 
+"""
+    这个demo展示了如何使用generate_anchors函数生成锚框，并将其可视化。
+    没有涉及到iou计算。
+    没有涉及到nms。
+    没有涉及到锚框的筛选。
+    没有涉及到目标检测。
+"""
+
 
 def main():
     # 读取图像
