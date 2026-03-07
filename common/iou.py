@@ -3,45 +3,42 @@ import torch
 """
     计算两组锚框的交并比
 """
-# anchors1(NAC1,4):(xmin, ymin, xmax, ymax)
-# anchors2(NAC2,4):(xmin, ymin, xmax, ymax)
-def iou(anchors1, anchors2):
-    # 这种计算方式基于边界框的标准表示方法：[xmin, ymin, xmax, ymax]，其中：
-    # - anchors1[:, 0] 是左上角x坐标
-    # - anchors1[:, 1] 是左上角y坐标
-    # - anchors1[:, 2] 是右下角x坐标
-    # - anchors1[:, 3] 是右下角y坐标
-    # anchors_area(NAC)=(xmax-xmin)*(ymax-ymin)
-    anchors_area = lambda anchors: ((anchors[:, 2] - anchors[:, 0]) * (anchors[:, 3] - anchors[:, 1]))
 
-    # areas1：(NAC1,)
-    # areas2：(NAC2,)
-    areas1 = anchors_area(anchors1)
-    areas2 = anchors_area(anchors2)
-    # anchors1[:, None, :2] 的形状为 (NAC1, 1,    2) :(xmin, ymin)
-    # anchors2[:, :2]    广播后形状为 (1，   NAC2, 2) :(xmin, ymin)
-    # 广播(NAC1,NAC2,2):(x左上,y左上)
-    inter_upperlefts = torch.max(anchors1[:, None, :2], anchors2[:, :2]) # 内部左上角顶点
-    # anchors1[:, None, 2:] 的形状为 (NAC1, 1, 2) :(xmax, ymax)        
-    # anchors2[:, 2:]       的形状为 (NAC2, 2)    :(xmax, ymax)
-    # 广播(NAC1,NAC2,2):(x右下,y右下)
-    inter_lowerrights = torch.min(anchors1[:, None, 2:], anchors2[:, 2:]) # 内部右下角顶点
+# shape(box数量，4):[xmin, ymin, xmax, ymax]
+def box_iou(boxes1, boxes2):
+ 
+    # 定一个内部函数：计算边界框的面积
+    box_area = lambda boxes: ((boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1]))
+
+    # shape(box数量，)
+    areas1 = box_area(boxes1)
+    # shape(box数量，)
+    areas2 = box_area(boxes2)
+
+
+    # None 在 PyTorch/NumPy 索引中等同于 unsqueeze 操作，它在指定位置插入一个大小为 1 的新维度。
+    # (N,1,2) (1,M,2) -> (N,M,2)
+    # 排列组合=N*M组(左上内部xy坐标)
+    inter_upperlefts = torch.max(boxes1[:, None, :2], boxes2[:, :2]) # 内部顶点
+    # 排列组合=N*M组(右下内部xy坐标)
+    inter_lowerrights = torch.min(boxes1[:, None, 2:], boxes2[:, 2:]) # 内部顶点
     # 计算交集区域的宽度和高度
     # .clamp(min=0) 将所有负值截断为0
     # 这一步非常重要，因为当两个边界框没有交集时
     # inter_lowerrights - inter_upperlefts 可能会产生负值
-    # inters(NAC1,NAC2,2):(x右下-x左上,y右下-y左上)
+    # 排列组合=N*M组(交集长宽wh)
     inters = (inter_lowerrights - inter_upperlefts).clamp(min=0)
-    # 计算交集区域的面积
-    # inters[:, :, 0]:宽=(x右下-x左上)
-    # inters[:, :, 1]:高=(y右下-y左上)
-    # inter_areas(NAC1,NAC2):交集面积=宽*高
-    inter_areas = inters[:, :, 0] * inters[:, :, 1]
+    inter_w = inters[:, :, 0]
+    inter_h = inters[:, :, 1]
+    # 排列组合=N*M组(交集面积)
+    inter_areas = inter_w * inter_h
+    # ------------------------------------------------- # 
 
     # 计算并集区域的面积
-    # (NAC1,1)+(NAC2)=(NAC1,1)+(1,NAC2)=(NAC1,NAC2)
-    # (NAC1,NAC2)-(NAC1,NAC2)
-    # union_areas(NAC1,NAC2)
+    # 这里用到广播
+    # areas1[N,1] + areas2[1,M] = sum[N,M]
+    # inter_areas[N,M]
+    # union_areas[N,M]
     union_areas = areas1[:, None] + areas2 - inter_areas
-    # 输出(NAC1,NAC2)  
+    # 输出(N,M)
     return inter_areas / union_areas
