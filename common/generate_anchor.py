@@ -1,6 +1,7 @@
+import torch
 # sizes:缩放比例列表
 # ratios:宽高比列表
-def anchor_generator(picture, sizes, ratios):
+def generate_anchors(picture, sizes, ratios):
     """生成以每个像素为中心具有不同形状的锚框"""
     # picture(B,C,H,W)
     device, num_sizes, num_ratios = picture.device, len(sizes), len(ratios)

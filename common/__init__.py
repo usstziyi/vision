@@ -6,6 +6,7 @@ from .nms import nms
 from .show_boxes import show_boxes,display
 from .bind import bind_ground_truth_to_anchor
 from .pre import multibox_detection
+from .generate_anchor import generate_anchors
 from .generate_fmap_anchors import generate_fmap_anchors
 from .tiny_ssd import TinySSD
 from .displaymodel import display_model 
