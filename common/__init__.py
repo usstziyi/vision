@@ -10,7 +10,7 @@ from .generate_fmap_anchors import generate_fmap_anchors
 from .tiny_ssd import TinySSD
 from .displaymodel import display_model 
 from .pre import multibox_detection
-from .offset import anchor_label
+from .offset import anchor_label,offset_boxes,offset_inverse
 
 
 
@@ -30,5 +30,7 @@ __all__ = [
     'TinySSD',
     'display_model',
     'multibox_detection',
-    'anchor_label'
+    'anchor_label',
+    'offset_boxes',
+    'offset_inverse'   
 ]
