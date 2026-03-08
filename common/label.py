@@ -7,72 +7,96 @@ from .offset import offset_anchors
     使用真实边界框标记锚框
     返回每个锚框的偏移量、掩码、类别标签
 '''
-
-
-# anchors(NAC,4)：一个样本中所有锚框坐标
-# labels (NGT,5):(class,xmin,ymin,xmax,ymax)
-def anchors_label(anchors, labels):
-    device = anchors.device
-
+# anchors(1,NAC,4)：一个样本中所有锚框坐标
+# labels(B,NGT,5):(class, xmin,ymin,xmax,ymax)
+# labels 传入的是批次样本的真实边界框标签和坐标
+# 而 anchors 传入的是单个样本的锚框集合。
+def anchor_label(anchors, labels):
+    """使用真实边界框标记锚框"""
+    # B
+    batch_size = labels.shape[0]
+    # anchors(NAC,4)：一个样本中所有锚框坐标
+    anchors = anchors.squeeze(0)
     # NAC
-    num_anchors = anchors.shape[0]   
-
-    # labels(NGT,5):(class,xmin,ymin,xmax,ymax)
-    # label(NGT,)
-    label = labels[:, 0]
-    # gts:(NGT,4):(xmin,ymin,xmax,ymax)
-    gts = labels[:, 1:]
-
-    # gts(NGT,4):(xmin,ymin,xmax,ymax)
-    # anchors(NAC,4):(xmin,ymin,xmax,ymax)
-    # anchors_gt_map(NAC,):-1表示anchor未bind到gt,anchor是负样本
-    anchors_gt_map = bind_ground_truth_to_anchor(gts, anchors, device)
-
-    # (anchors_gt_map >= 0).float():float(NAC,)
-    # .unsqueeze(-1):(NAC,1)
-    # .repeat(1, 4):float(NAC,4)
-    # positive_mask(NAC,4):每个锚框是否对应真实边界框的掩码
-    # [[1,1,1,1],
-    #  [0,0,0,0],
-    #  [1,1,1,1]]
-    positive_mask = ((anchors_gt_map >= 0).float().unsqueeze(-1)).repeat(1, 4)
-
-    # 创建类标签和分配的边界框坐标存储空间
-    # anchors_label(NAC):每个锚框的类别标签
-    # anchors_gt(NAC,4):每个锚框的真实边界框坐标
-    anchors_label = torch.zeros(num_anchors, dtype=torch.long, device=device)
-    anchors_gt = torch.zeros((num_anchors, 4), dtype=torch.float32, device=device)
+    num_anchors = anchors.shape[0]
+    device = anchors.device
     
 
-    # positive_ac_id(P,1)->(P,)
-    positive_ac_id = torch.nonzero(anchors_gt_map >= 0).reshape(-1)
-    # positive_gt_id(P,):每个锚框对应的真实边界框索引
-    positive_gt_id = anchors_gt_map[positive_ac_id]
-    # 填充类别Class
-    # 0-bg, 1-c1, 2-c2, ...
-    # 因为label中的类别不包括背景类
-    # 所以label中的类别要+1，和本第的规则匹配
-    # 剩下的锚框类别为背景类0
-    anchors_label[positive_ac_id] = label[positive_gt_id].long() + 1
-    # 填充真实边界框坐标(xmin,ymin,xmax,ymax)
-    anchors_gt[positive_ac_id] = gts[positive_gt_id, :]   
+    # 存储每个样本中所有锚框是否对应真实边界框的掩码
+    list_assigned_mask = [] 
+    # 存储每个样本中所有锚框与真实边界框的偏移量
+    list_assigned_offset = []
+    # 存储每个样本中所有锚框的类别标签
+    list_assigned_classes = []
     
-    # 一个样本中所有锚框和真实边界框的偏移量
-    # anchors(NAC,4):(xmin,ymin,xmax,ymax)
-    # anchors_gt(NAC,4):(xmin,ymin,xmax,ymax)
-    # gt_mask(NAC,4):每个锚框是否对应真实边界框的掩码
-    # 一个ac对一个gt，计算ac到gt的偏移量
-    # 其中有的ac(负样本)对的空gt为(0,0,0,0)，所以最后要乘以positive_mask
-    # 最后得到的offset都是正样本的偏移量
-    # offset(NAC,4):(dx,dy,dw,dh)
-    offset = offset_anchors(anchors, anchors_gt) * positive_mask
+    # 一个样本的所有锚框和真实边界框的偏移量
+    for i in range(batch_size):
+        # labels(B,NGT,5)
+        # label(NGT,5)
+        label = labels[i, :, :]
+        classes = label[:, 0].long()
+        boxes = label[:, 1:]
 
-    # offset(4*NAC,):(tx1,ty1,tw1, th1, tx2, ty2, tw2, th2, ...)
-    # positive_mask(4*NAC,):(1,1,1,1,0,0,0,0,1,1,1,1,...)
-    # anchors_label(NAC,):(c1,c2,c3,c4,c5,...)
-    offset = offset.reshape(-1)
-    positive_mask = positive_mask.reshape(-1)
-    anchors_label = anchors_label.reshape(-1)
+        # label[:,1:]:(NGT,4):(xmin,ymin,xmax,ymax)
+        # anchors(NAC,4):(xmin,ymin,xmax,ymax)
+        # anchors_bbox_map(NAC):每个锚框对应的真实边界框索引
+        anchors_bbox_map = assign_anchor_to_bbox(boxes, anchors, device)
 
 
-    return (offset, positive_mask, anchors_label)  
+        # 创建类标签和分配的边界框坐标存储空间
+        # class_labels(NAC):每个锚框的类别标签
+        # assigned_bb(NAC,4):每个锚框的真实边界框坐标
+              # 用来做掩码
+        assigned_classes = torch.zeros(num_anchors, dtype=torch.long, device=device)          # 用来做分类
+        assigned_bboxes = torch.zeros((num_anchors, 4), dtype=torch.float32, device=device)   # 用来做回归
+        
+
+        # bind大矩阵(anchors_bbox_map的稀疏矩阵)
+        # * * * * * 
+        # * * * * *
+        # * * * * *
+        # * * * * *
+        # * * * * *
+        # * * * * *
+        # * * * * *
+        # * * * * *
+        # * * * * *
+        # * * * * *
+        # * * * * *
+        # * * * * *
+
+
+
+        # 找出正样本的行
+        assigned_mask = (anchors_bbox_map > 0).long()
+        row = torch.nonzero(assigned_mask).reshape(-1)
+        col = anchors_bbox_map[row]
+    
+        # 0-bg, 1-c1, 2-c2, ...
+        assigned_classes[row] = classes[col] + 1
+        assigned_bboxes[row] = boxes[col]
+        assigned_offset = offset_boxes(anchors, assigned_bboxes) * assigned_mask.unsqueeze(-1)
+
+
+  
+    
+        # 拼接本batch所有样本的结果
+        # bbox_mask.reshape(-1):(4*NAC,):(1,1,1,1,0,0,0,0,1,1,1,1,...)
+        list_assigned_mask.append(assigned_mask.reshape(-1))
+        # offset.reshape(-1):(4*NAC,):(tx1,ty1,tw1, th1, tx2, ty2, tw2, th2, ...)
+        list_assigned_offset.append(assigned_offset)
+        # class_labels(NAC,):(c1,c2,c3,0,0,0,c4,c5,...)
+        list_assigned_classes.append(assigned_classes)
+
+    # 压缩本batch所有样本的结果
+    # batch_assigned_offset(B,4*NAC):(tx1,ty1,tw1, th1, tx2, ty2, tw2, th2, ...)
+    batch_assigned_offset = torch.stack(list_assigned_offset, dim=0)
+    # batch_assigned_mask(B,4*NAC):(1,1,1,1,0,0,0,0,1,1,1,1,...)
+    batch_assigned_mask = torch.stack(list_assigned_mask, dim=0)
+    # batch_assigned_classes(B,NAC):(c1,c2,c3,0,0,0,c4,c5,...)
+    batch_assigned_classes = torch.stack(list_assigned_classes, dim=0)
+    # 每个锚框是否对应真实边界框的掩码
+    # 偏移量：batch_assigned_offset(B,4*NAC):(tx1,ty1,tw1, th1, tx2, ty2, tw2, th2, ...)
+    # 掩码：batch_assigned_mask(B,4*NAC):(1,1,1,1,0,0,0,0,1,1,1,1,...)
+    # 类别：batch_assigned_classes(B,NAC):(c1,c2,c3,0,0,0,c4,c5,...)
+    return (batch_assigned_offset, batch_assigned_mask, batch_assigned_classes)

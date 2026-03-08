@@ -41,4 +41,4 @@ def box_iou(boxes1, boxes2):
     # union_areas[N,M]
     union_areas = areas1[:, None] + areas2 - inter_areas
     # 输出(N,M)
-    return inter_areas / union_areas
+    return inter_areas / (union_areas + 1e-6) # 防止除0
