@@ -1,5 +1,5 @@
 import torch
-from .iou import iou
+from .iou import box_iou
 
 '''
     正负样本分配:其目的是决定哪些锚框负责预测哪个目标，并用于后续的损失计算和训练。

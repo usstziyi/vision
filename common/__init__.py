@@ -1,7 +1,6 @@
-from .offset import offset_anchors
-from .offset import offset_inverse
+
 from .ralative2pixel import relative_to_pixel
-from .iou import iou 
+from .iou import box_iou 
 from .nms import nms
 from .show_boxes import show_boxes,display
 from .assign import assign_anchor_to_bbox
@@ -11,6 +10,7 @@ from .generate_fmap_anchors import generate_fmap_anchors
 from .tiny_ssd import TinySSD
 from .displaymodel import display_model 
 from .pre import multibox_detection
+from .offset import anchor_label
 
 
 
@@ -21,7 +21,7 @@ __all__ = [
     'generate_anchors',
     'relative_to_pixel',
     'show_anchors','display',
-    'iou',
+    'box_iou',
     'nms',
     'show_boxes',
     'assign_anchor_to_bbox',
@@ -29,5 +29,6 @@ __all__ = [
     'generate_fmap_anchors',
     'TinySSD',
     'display_model',
-    'multibox_detection'
+    'multibox_detection',
+    'anchor_label'
 ]

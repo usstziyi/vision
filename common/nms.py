@@ -1,5 +1,5 @@
 import torch
-from .iou import iou
+from .iou import box_iou
 '''
     非极大值抑制非极大值抑制:删除置信度接近的锚框
     保留置信度最高的检测框，并抑制与其高度重叠（即交并比 IoU 较大）的其他检测框。
