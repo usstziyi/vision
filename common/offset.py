@@ -94,7 +94,7 @@ def anchor_label(anchors, labels):
 
 
         # 找出正样本的行
-        assigned_mask = (anchors_bbox_map > 0).long()
+        assigned_mask = (anchors_bbox_map >= 0).long()
         row = torch.nonzero(assigned_mask).reshape(-1)
         col = anchors_bbox_map[row]
     
