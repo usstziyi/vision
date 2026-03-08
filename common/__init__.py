@@ -4,7 +4,7 @@ from .ralative2pixel import relative_to_pixel
 from .iou import iou 
 from .nms import nms
 from .show_boxes import show_boxes,display
-from .bind import bind_ground_truth_to_anchor
+from .assign import assign_anchor_to_bbox
 from .pre import multibox_detection
 from .generate_anchor import generate_anchors
 from .generate_fmap_anchors import generate_fmap_anchors
@@ -24,7 +24,7 @@ __all__ = [
     'iou',
     'nms',
     'show_boxes',
-    'bind_ground_truth_to_anchor',
+    'assign_anchor_to_bbox',
     'multibox_detection',
     'generate_fmap_anchors',
     'TinySSD',

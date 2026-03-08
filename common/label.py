@@ -1,6 +1,32 @@
 import torch
-from .bind import bind_ground_truth_to_anchor
-from .offset import offset_anchors
+from .assign import assign_anchor_to_bbox
+
+
+'''
+    anchors(相对尺寸)到target_anchors(相对尺寸)的偏移量
+'''
+
+# 使用的是中心点坐标
+def offset_boxes(anchors, gt_boxes):
+    # anchors: [N, 4] -> (xa, ya, wa, ha)
+    # gt_boxes: [N, 4] -> (xb, yb, wb, hb)
+
+    eps = 1e-6
+
+    # 归一化
+    dx = (gt_boxes[:, 0] - anchors[:, 0]) / anchors[:, 2]
+    dy = (gt_boxes[:, 1] - anchors[:, 1]) / anchors[:, 3]
+    dw = torch.log(eps + gt_boxes[:, 2] / anchors[:, 2])
+    dh = torch.log(eps + gt_boxes[:, 3] / anchors[:, 3])
+
+    # 标准化
+    dx = (dx - 0) / 0.1
+    dy = (dy - 0) / 0.1
+    dw = (dw - 0) / 0.2
+    dh = (dh - 0) / 0.2
+
+    # [N, 4] -> (dx, dy, dw, dh)
+    return torch.stack([dx, dy, dw, dh], dim=1)
 
 
 '''
@@ -75,6 +101,7 @@ def anchor_label(anchors, labels):
         # 0-bg, 1-c1, 2-c2, ...
         assigned_classes[row] = classes[col] + 1
         assigned_bboxes[row] = boxes[col]
+        # 计算锚框到真实框的偏移量
         assigned_offset = offset_boxes(anchors, assigned_bboxes) * assigned_mask.unsqueeze(-1)
 
 
