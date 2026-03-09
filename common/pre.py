@@ -12,17 +12,17 @@ from .nms import nms
     - 在NMS后,一些低置信度的预测被标记为-1(忽略):这些锚框不是背景，是被丢弃的低质量前景
 """
 # 用于测试阶段
-def multibox_detection(cls_probs,       # cls_probs(B, NCLS, 锚框总数)：每个锚框的类别概率,包括背景0类别的概率
+def multibox_detection(pred_classes,       # cls_probs(B, NCLS, 锚框总数)：每个锚框的类别概率,包括背景0类别的概率
                        offset_preds,    # offset_preds(B, NAC*4)：每个锚框的偏移量预测
                        anchors,         # anchors(1, 锚框总数, 4):锚框生成器
                        nms_threshold=0.5,      # 非极大值抑制的IoU阈值，高于此阈值的重复框会被抑制
                        pos_threshold=0.009999999):  # 正类置信度阈值，低于此值的预测会被视为背景
     
-    device = cls_probs.device
+    device = pred_classes.device
 
-    batch_size = cls_probs.shape[0]
-    num_classes = cls_probs.shape[1]
-    num_anchors = cls_probs.shape[2] # 锚框总数
+    batch_size = pred_classes.shape[0]
+    num_classes = pred_classes.shape[1]
+    num_anchors = pred_classes.shape[2] # 锚框总数
 
     # anchors(1, NAC, 4) -> anchors(NAC, 4)
     anchors = anchors.squeeze(0)
@@ -32,7 +32,7 @@ def multibox_detection(cls_probs,       # cls_probs(B, NCLS, 锚框总数)：每
     list_pred_info = []
     for i in range(batch_size):
         # cls_prob(NCLS, 锚框总数)
-        cls_prob = cls_probs[i]
+        cls_prob = pred_classes[i]
         # cls_prob[0]  通常表示背景类的概率
         # cls_prob[1:] 表示除了背景类的所有物体类别的概率
         # torch.max dim=0
@@ -96,6 +96,9 @@ def multibox_detection(cls_probs,       # cls_probs(B, NCLS, 锚框总数)：每
         # scores(锚框总数,):模型预测的目标锚框的最大类别概率
         # keep_indices(R,):保留的anchor索引，R<=锚框总数
         # 此处的scores里面是多种类型混在一起的分数排名
+        # 混合类别的 NMS:先定类别，后做NMS,不会出现同一个预测框被分配为两个类别的情况
+        # 如果两个重叠很高的框，一个是“猫（0.9）”，一个是“狗（0.8）”。
+        # NMS 会保留分数高的“猫”，抑制掉“狗”。
         keep_indices = nms(pred_boxes, scores, nms_threshold)
 
         # 找到所有的non_keep索引，并将类设置为背景

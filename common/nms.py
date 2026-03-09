@@ -10,6 +10,7 @@ from .iou import box_iou
 # boxes: (N, 4)  N个边界框，每个框4个坐标
 # scores: (N,)   每个边界框的置信度得分
 # iou_threshold: 抑制阈值
+# 混合类别的 NMS
 def nms(boxes, scores, iou_threshold):
     # 对预测边界框的置信度进行排序
     # B: (N,)  按置信度降序排列的索引:从高到低
