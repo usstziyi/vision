@@ -42,7 +42,7 @@ def nms(boxes, scores, iou_threshold):
         # 转换为总绝对索引
         inds = inds + 1
         # 下一轮参与NMS的框索引
-        sorted_score = rest_indices[inds]
+        sorted_score = sorted_score[inds]
 
     return torch.tensor(keep_indices, device=boxes.device)  # (K,)  K为最终保留的框数量
 

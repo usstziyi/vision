@@ -1,8 +1,9 @@
 import torch
-from common import offset_inverse,nms
+from .offset import offset_inverse
+from .nms import nms
 
 """
-    使用非极大值抑制来预测最优质量的边界框
+    使用非极大值抑制来预测质量的边界框
     假设我们在检测图像中的猫：
     - 图像中有一只猫(类别1)
     - 生成了1000个锚框
@@ -108,6 +109,8 @@ def multibox_detection(cls_probs,       # cls_probs(B, NCLS, 锚框总数)：每
         # 不在keep中的anchor，类别索引下调到-1(丢弃)
         class_id[non_keep] = -1
 
+
+
         # 按照排序(keep,non_keep)后的索引重新排列class_id数组
         # 按照排序(keep,non_keep)后的索引重新排列scores数组
         # 按照排序(keep,non_keep)后的索引重新排列预测框数组
@@ -131,4 +134,4 @@ def multibox_detection(cls_probs,       # cls_probs(B, NCLS, 锚框总数)：每
         # list_pred_info(B, NAC, 6)
         # 调用 torch.stack(out) 时不指定 dim 参数，
         # 函数会沿着第 0 维（第一个维度）创建一个新的维度来堆叠输入张量序列
-    return torch.stack(list_pred_info, dim=1)
+    return torch.stack(list_pred_info, dim=0)

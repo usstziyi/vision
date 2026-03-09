@@ -18,6 +18,7 @@ from .offset import anchor_label,offset_boxes,offset_inverse
 __all__ = [
     'offset_anchors',
     'offset_inverse',
+    'offset_boxes',  
     'generate_anchors',
     'relative_to_pixel',
     'show_anchors','display',
@@ -30,7 +31,6 @@ __all__ = [
     'TinySSD',
     'display_model',
     'multibox_detection',
-    'anchor_label',
-    'offset_boxes',
-    'offset_inverse'   
+    'anchor_label'
+
 ]
