@@ -52,7 +52,7 @@ def assign_anchor_to_bbox(ground_truth, anchors, device, iou_threshold=0.5):
     # jaccard(num_anchors,num_gt_boxes)
     jaccard = box_iou(anchors, ground_truth)
     # 创建一个全为-1的张量，用于存储每个锚框分配到的真实边界框索引
-    # anchors_bbox_map(NAC,):-1表示未分配
+    # anchors_bbox_map(NAC,):-1 表示未分配, 0 表示背景
     anchors_bbox_map = torch.full((num_anchors,), -1, dtype=torch.long,device=device)
 
     # 找每行最大IoU

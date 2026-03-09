@@ -13,21 +13,21 @@ from .iou import box_iou
 def nms(boxes, scores, iou_threshold):
     # 对预测边界框的置信度进行排序
     # B: (N,)  按置信度降序排列的索引:从高到低
-    B = torch.argsort(scores, dim=-1, descending=True)  
+    sorted_score = torch.argsort(scores, dim=-1, descending=True)  
     keep_indices = []  # 保留预测边界框的指标
 
     # NMS
-    while B.numel() > 0:# 当待处理框数量大于0时，继续处理
+    while sorted_score.numel() > 0:# 当待处理框数量大于0时，继续处理
         # 本轮最高置信框索引
-        i = B[0]
+        max_indices = sorted_score[0]
+        rest_indices = sorted_score[1:]
         # 保留当前最高置信框索引
-        keep_indices.append(i)
+        keep_indices.append(max_indices)
         # 如果只剩一个框，直接跳出循环
-        if B.numel() == 1: 
+        if sorted_score.numel() == 1: 
             break
 
-        max_indices = i
-        rest_indices = B[1:]
+
         
         # 取出当前最高置信框
         current_box = boxes[max_indices, :].reshape(-1, 4)          # (1, 4)
@@ -42,7 +42,7 @@ def nms(boxes, scores, iou_threshold):
         # 转换为总绝对索引
         inds = inds + 1
         # 下一轮参与NMS的框索引
-        B = B[inds]
+        sorted_score = rest_indices[inds]
 
     return torch.tensor(keep_indices, device=boxes.device)  # (K,)  K为最终保留的框数量
 

@@ -1,6 +1,5 @@
 import torch
-
-from .nms import nms
+from common import offset_inverse,nms
 
 """
     使用非极大值抑制来预测边界框
@@ -29,12 +28,12 @@ def multibox_detection(cls_probs,       # cls_probs(B, NCLS, 锚框总数)：每
 
 
 
-    out = []
+    list_pred_info = []
     for i in range(batch_size):
         # cls_prob(NCLS, 锚框总数)
         cls_prob = cls_probs[i]
         # cls_prob[0]  通常表示背景类的概率
-        # cls_prob[1:] 表示除了前景的所有类别概率
+        # cls_prob[1:] 表示除了背景类的所有物体类别的概率
         # torch.max dim=0
         # 给每个anchor找到最大的类别概率和对应的类别索引
         # scores(NAC):每个anchor的最大类别概率
@@ -87,31 +86,26 @@ def multibox_detection(cls_probs,       # cls_probs(B, NCLS, 锚框总数)：每
         # anchors(锚框总数, 4)
         # offset_pred(锚框总数, 4)
         # target_anchors(锚框总数, 4):模型预测的目标锚框(相对尺寸)
-        # 把偏移量施加到锚框上，得到目标锚框(相对尺寸)
-        target_anchors = offset_inverse(anchors, offset_pred)
+        # 把偏移量施加到锚框上，得到预测框(相对尺寸)
+        pred_boxes = offset_inverse(anchors, offset_pred)
 
 
         # 非极大值抑制：确保了最终输出结果没有冗余重叠框
         # target_anchors(锚框总数,4):模型预测的目标锚框(相对尺寸)
         # scores(锚框总数,):模型预测的目标锚框的最大类别概率
-        # keep(R,):保留的anchor索引，R<=锚框总数
-        keep = nms(target_anchors, scores, nms_threshold)
+        # keep_indices(R,):保留的anchor索引，R<=锚框总数
+        # 此处的scores里面是多种类型混在一起的分数排名
+        keep_indices = nms(pred_boxes, scores, nms_threshold)
 
         # 找到所有的non_keep索引，并将类设置为背景
-        all_idx = torch.arange(num_anchors, dtype=torch.long, device=device)
-        # combined(K+NAC,):保留的anchor索引+所有anchor索引
-        combined = torch.cat((keep, all_idx))
-        # 比如 [0, 2, 0, 1, 2, 3] 
-        # uniques ：所有唯一元素 [0, 1, 2, 3] 
-        # counts ：每个唯一元素在 combined 中出现的次数 [2, 1, 2, 1] 
-        uniques, counts = combined.unique(return_counts=True)
-        # 凡是counts为1的索引，都不在keep中，被认为是背景
-        # non_keep(NAC-K,):所有不在keep中的anchor索引
-        non_keep = uniques[counts == 1]
-        # all_id_sorted(K+NAC-K,):保留的anchor索引+所有不在keep中的anchor索引
+        mask = torch.zeros(num_anchors, dtype=torch.bool, device=device)
+        mask[keep_indices] = True
+        non_keep = torch.where(~mask)[0]
+
+
         # 重新排列(keep,non_keep),keep+non_keep=所有anchor索引
-        all_id_sorted = torch.cat((keep, non_keep))
-        # 不在keep中的anchor，类别索引下调到-1(背景类)
+        all_id_sorted = torch.cat((keep_indices, non_keep))
+        # 不在keep中的anchor，类别索引下调到-1(丢弃)
         class_id[non_keep] = -1
 
         # 按照排序(keep,non_keep)后的索引重新排列class_id数组
@@ -119,15 +113,11 @@ def multibox_detection(cls_probs,       # cls_probs(B, NCLS, 锚框总数)：每
         # 按照排序(keep,non_keep)后的索引重新排列预测框数组
         class_id = class_id[all_id_sorted]
         scores = scores[all_id_sorted] 
-        predicted_bb = target_anchors[all_id_sorted] 
+        pred_boxes = pred_boxes[all_id_sorted] 
         
 
-        # NMS可能保留了一些置信度不高但不与其他框重叠的预测框
-        # 这些低置信度预测很可能是误检，需要进一步过滤
-        # 再次筛选，将置信度低于阈值的预测框类别设为-1
-        # pos_threshold是一个用于非背景预测的阈值
-        # 当一个预测框被判定为背景时（因为置信度太低），我们用 1 - 原分数 来表示它作为背景的可能性
-        # 再次更新
+        # non_keep中的class_id已经被设为-1(丢弃)
+        # 还需要从keep中筛选出置信度低于阈值的预测框
         below_min_idx = (scores < pos_threshold)
         class_id[below_min_idx] = -1
         scores[below_min_idx] = 1 - scores[below_min_idx]
@@ -135,10 +125,10 @@ def multibox_detection(cls_probs,       # cls_probs(B, NCLS, 锚框总数)：每
         # class_id(NAC,1)
         # scores(NAC,1)
         # predicted_bb(NAC, 4)
-        # pred_info(NAC, 6):(class_id, scores, predicted_bb)
-        pred_info = torch.cat((class_id.unsqueeze(1), scores.unsqueeze(1), predicted_bb), dim=1)
-        out.append(pred_info)
-        # out(B, NAC, 6)
+        # pred_info(NAC, 6):(class_id, scores, pred_boxes)
+        pred_info = torch.cat((class_id.unsqueeze(1), scores.unsqueeze(1), pred_boxes), dim=1)
+        list_pred_info.append(pred_info)
+        # list_pred_info(B, NAC, 6)
         # 调用 torch.stack(out) 时不指定 dim 参数，
         # 函数会沿着第 0 维（第一个维度）创建一个新的维度来堆叠输入张量序列
-    return torch.stack(out)
+    return torch.stack(list_pred_info, dim=1)
