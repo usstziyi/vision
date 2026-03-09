@@ -131,6 +131,9 @@ def anchor_label(anchors, labels):
 
 
 # 把偏移量施加到锚框上，得到预测框
+# 注：这个函数是预测阶段用的，不是训练阶段用的
+# offsets是预测的偏移量，因为预测阶段没有标签可用
+# 这个函数返回锚框+预测后的结果
 def offset_inverse(anchors, offsets):
     """
     将偏移量还原为边界框坐标。
