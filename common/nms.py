@@ -6,45 +6,59 @@ from .iou import box_iou
 '''
 
 
-# anchors: (NAC, 4)  N个边界框，每个框4个坐标:模型预测的目标锚框(相对尺寸)
-# scores: (NAC,)   每个边界框的置信度得分:模型预测的目标锚框的最大类别概率
+# 非极大值抑制
+# boxes: (N, 4)  N个边界框，每个框4个坐标
+# scores: (N,)   每个边界框的置信度得分
 # iou_threshold: 抑制阈值
-def nms(anchors, scores, iou_threshold):
+def nms(boxes, scores, iou_threshold):
     # 对预测边界框的置信度进行排序
-    # anchor_inds: (N,)  按置信度降序排列的索引:原始索引
-    anchor_inds = torch.argsort(scores, dim=-1, descending=True)  
-    keep = []  # 保留预测边界框的原始索引
+    # B: (N,)  按置信度降序排列的索引:从高到低
+    B = torch.argsort(scores, dim=-1, descending=True)  
+    keep_indices = []  # 保留预测边界框的指标
 
     # NMS
-    while anchor_inds.numel() > 0:# 当待处理框数量大于0时，继续处理
-        # 当前列表中最高置信框原始索引
-        max_score_id = anchor_inds[0]
+    while B.numel() > 0:# 当待处理框数量大于0时，继续处理
+        # 本轮最高置信框索引
+        i = B[0]
         # 保留当前最高置信框索引
-        keep.append(max_score_id)
+        keep_indices.append(i)
         # 如果只剩一个框，直接跳出循环
-        if anchor_inds.numel() == 1: 
+        if B.numel() == 1: 
             break
+
+        max_indices = i
+        rest_indices = B[1:]
         
-        # 剩余待比较框索引
-        rest_anchor_inds = anchor_inds[1:]
-
         # 取出当前最高置信框
-        # max_score_anchor: (1, 4)
-        max_score_anchor = anchors[max_score_id, :].reshape(-1, 4)
+        current_box = boxes[max_indices, :].reshape(-1, 4)          # (1, 4)
         # 取出剩余待比较框
-        # rest_anchors: (N-1, 4)
-        rest_anchors = anchors[rest_anchor_inds, :].reshape(-1, 4)
+        rest_boxes = boxes[rest_indices, :].reshape(-1, 4)       # (N-1, 4)
+        # 计算两两 IoU(1,N-1)->(N-1,)
+        # (0,1,2,3,4)
+        # (0-1,0-2,0-3,0-4)
+        iou = box_iou(current_box, rest_boxes).reshape(-1)  # (N-1,)
+        # 筛选出 IoU 小于阈值的框自然索引
+        inds = torch.nonzero(iou <= iou_threshold).reshape(-1)  # inds: (M,)  保留的索引，M <= N-1
+        # 转换为总绝对索引
+        inds = inds + 1
+        # 下一轮参与NMS的框索引
+        B = B[inds]
 
-        # anchor_iou: (1,N-1)->(N-1,)
-        # 此时anchor_iou并不是从大到小顺序序列
-        anchor_iou = iou(max_score_anchor, rest_anchors).reshape(-1)
-        # 筛选出 IoU 小于阈值的框自然索引,保留，删除太相似的anchor
-        # mask(R,)
-        mask = anchor_iou <= iou_threshold
-        # 跳过第一个框，因为它是当前最高置信框
-        # 更新anchor索引：去掉本轮最大置信框和相似框，保留其他框，用于下一轮计算
-        # anchor_inds: (R,)
-        anchor_inds = anchor_inds[1:][mask]
-    # keep(k,): 最终保留的框索引(原始索引)
-    keep = torch.tensor(keep, device=anchors.device)
-    return keep
+    return torch.tensor(keep_indices, device=boxes.device)  # (K,)  K为最终保留的框数量
+
+
+# pytorch自带的nms函数
+# from torchvision.ops import nms
+# import torch
+
+# # 假设 boxes 和 scores 已经定义
+# # boxes: (N, 4) 格式为 [x1, y1, x2, y2]
+# # scores: (N,)
+# # iou_threshold: 标量
+
+# keep_indices = nms(boxes, scores, iou_threshold)
+
+# # keep_indices 是一个包含保留框索引的 Tensor (K,)
+# # 你可以通过它来获取最终的框和得分：
+# final_boxes = boxes[keep_indices]
+# final_scores = scores[keep_indices]
