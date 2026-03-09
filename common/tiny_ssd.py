@@ -1,9 +1,6 @@
 # Single Shot MultiBox Detector
 import torch
-import torchvision
 from torch import nn
-from torch.nn import functional as F
-from d2l import torch as d2l
 
 # 宽高减半块：通道数改变，宽、高减半
 # down_sample_blk 是一个标准的“双卷积 + 下采样”模块
