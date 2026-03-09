@@ -2,7 +2,7 @@ import torch
 from common import offset_inverse,nms
 
 """
-    使用非极大值抑制来预测边界框
+    使用非极大值抑制来预测最优质量的边界框
     假设我们在检测图像中的猫：
     - 图像中有一只猫(类别1)
     - 生成了1000个锚框
