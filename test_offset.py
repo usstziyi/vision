@@ -20,8 +20,8 @@ h, w = img.shape[:2]
 fig = plt.imshow(img)
 bbox_scale = torch.tensor((w, h, w, h))
 # 乘以 bbox_scale 将归一化坐标转换为实际的像素坐标
-show_boxes(fig.axes, ground_truth[:, 1:] * bbox_scale, ['dog', 'cat'], 'k')
-show_boxes(fig.axes, anchors * bbox_scale, ['0', '1', '2', '3', '4'])
+show_boxes(fig.axes, ground_truth[:, 1:] * bbox_scale, ['dog', 'cat'], linewidth=2, colors=['k'])
+show_boxes(fig.axes, anchors * bbox_scale, ['0', '1', '2', '3', '4'], linewidth=2)
 
 # 提升维度，将锚框和真实边界框转换为批量格式
 anchors = anchors.unsqueeze(dim=0)
