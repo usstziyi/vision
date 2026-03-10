@@ -19,12 +19,14 @@ def bbox_predictor(num_inputs, num_anchors):
                      padding=1)                        # 填充大小，保持特征图尺寸不变
 
 
-cls_model1 = cls_predictor(8,5,10)
+cls_model1 = cls_predictor(8, 5, 10)
 cls_model2 = cls_predictor(16, 3, 10)
-Y1 = torch.randn(2,8,20,20)
-Y2 = torch.randn(2, 16, 10, 10)
-print(cls_model1(Y1).shape)
-print(cls_model2(Y2).shape)
+X1 = torch.randn(2, 8, 20, 20)
+X2 = torch.randn(2, 16, 10, 10)
+Y1 = cls_model1(X1)
+Y2 = cls_model2(X2)
+print(Y1.shape)
+print(Y2.shape)
 
 
 # 转置
@@ -33,12 +35,12 @@ def transpose_output(preds):
 
 # 展平
 def flatten_pred(preds):
-    return torch.flatten(preds, start_dim=1) # 从最高维开始抽丝
+    return torch.flatten(transpose_output(preds), start_dim=1) # 从最高维开始抽丝
 
 # 拼接
 def concat_preds(preds):
-    return torch.cat([flatten_pred(p) for p in preds], dim=1)
+    return torch.cat([flatten_pred(p) for p in preds], axis=1)
 
-print(concat_preds([flatten_pred(transpose_output(Y1)), flatten_pred(transpose_output(Y2))]).shape)
+print(concat_preds([Y1,Y2]).shape)
 
 
