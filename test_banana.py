@@ -75,7 +75,14 @@ def load_data_bananas(batch_size, normalize_coords=True):
     # num_workers > 0 可以进一步加速数据加载（多进程）
     train_iter = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
     val_iter = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
-    
+    print(f"训练集批次数量：{len(train_iter)}")
+    print(f"训练集样本数量：{len(train_dataset)}")
+    print(f"验证集批次数量：{len(val_iter)}")
+    print(f"验证集样本数量：{len(val_dataset)}")
     return train_iter, val_iter
 
-load_data_bananas(32)
+if __name__ == '__main__':
+    train_iter, val_iter = load_data_bananas(32)
+    batch = next(iter(train_iter))
+    print(batch[0].shape, batch[1].shape)
+
