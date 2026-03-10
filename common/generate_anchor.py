@@ -1,8 +1,8 @@
 import torch
 # sizes:缩放比例列表
 # ratios:宽高比列表
+# 生成以每个像素为中心具有不同形状的锚框
 def generate_anchors(picture, sizes, ratios):
-    """生成以每个像素为中心具有不同形状的锚框"""
     # picture(B,C,H,W)
     device, num_sizes, num_ratios = picture.device, len(sizes), len(ratios)
     # size_tensor：不同缩放比例的个数
@@ -85,3 +85,14 @@ def generate_anchors(picture, sizes, ratios):
     bbox_logic = bbox_center_logic_grid + bbox_w_h_half_logic
     # 输出：(1, bpp*h*w, 4)
     return bbox_logic.unsqueeze(0)
+
+
+# 通过特征图生成锚框(内部还是调用generate_anchors)
+def generate_anchors_by_feature_map(fmap_w, fmap_h, scales, ratios=[1, 2, 0.5]):
+    # 前两个维度上的值不影响输出
+    # 等效特征图(B, C, h, w)
+    fmap = torch.zeros((1, 3, fmap_h, fmap_w)) # 影子张量
+    # 在特征图上生成锚框:归一化坐标
+    anchors = generate_anchors(fmap, scales, ratios)
+    # 输出：(1, bpp*h*w, 4)
+    return anchors
