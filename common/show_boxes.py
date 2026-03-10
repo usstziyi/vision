@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 # 显示边界框bbox/锚框anchor
 # boxes:盒子的实际坐标，格式为(左上x,左上y,右下x,右下y)
-def show_boxes(axes, boxes, labels=None, colors=None):
+def show_boxes(axes, boxes, labels=None,linewidth=2, colors=None):
     """显示某个像素为中心的所有边界框"""
     # 安全检查
     def _make_list(obj, default_values=None):
@@ -23,7 +23,7 @@ def show_boxes(axes, boxes, labels=None, colors=None):
     for i, box in enumerate(boxes):
         color = colors[i % len(colors)] # 循环使用颜色列表
         # 盒子
-        rect = plt.Rectangle(xy=(box[0], box[1]), width=box[2]-box[0], height=box[3]-box[1],fill=False, edgecolor=color, linewidth=2)
+        rect = plt.Rectangle(xy=(box[0], box[1]), width=box[2]-box[0], height=box[3]-box[1],fill=False, edgecolor=color, linewidth=linewidth)
         axes.add_patch(rect) # 把矩形数据添加到绘图区(axes)中
         # 盒子标签
         if labels and len(labels) > i:
@@ -64,5 +64,5 @@ def display(img, output, threshold):
         #'%.2f' % score 是Python中的字符串格式化语法，将浮点数格式化为保留两位小数的字符串
         labels.append('%.2f' % score)
     # 显示所有框
-    show_boxes(axes, boxes, labels)
+    show_boxes(axes, boxes, labels,linewidth=2)
     plt.show()  

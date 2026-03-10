@@ -3,6 +3,7 @@ import pandas as pd
 import torch
 import torchvision.io as tv_io
 from torch.utils.data import Dataset, DataLoader
+from common import show_boxes
 
 def read_labels_bananas(is_train=True):
     """仅读取标签CSV，不碰图片"""
@@ -62,7 +63,8 @@ class BananasDataset(Dataset):
         
         # 转换为 tensor 并增加维度 -> (1, 5)
         target_tensor = torch.tensor(target).unsqueeze(0)
-        
+        # image: (C, H, W)
+        # target_tensor: (1, 5)
         return image, target_tensor
 
     def __len__(self):
@@ -75,8 +77,8 @@ def load_data_bananas(batch_size, normalize_coords=True):
     # num_workers > 0 可以进一步加速数据加载（多进程）
     train_iter = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
     val_iter = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
-    print(f"训练集批次数量：{len(train_iter)}")
-    print(f"训练集样本数量：{len(train_dataset)}")
+    print(f"训练集批次数量：{len(train_iter)}")    # batch_number
+    print(f"训练集样本数量：{len(train_dataset)}") # sample_number
     print(f"验证集批次数量：{len(val_iter)}")
     print(f"验证集样本数量：{len(val_dataset)}")
     return train_iter, val_iter
@@ -84,5 +86,26 @@ def load_data_bananas(batch_size, normalize_coords=True):
 if __name__ == '__main__':
     train_iter, val_iter = load_data_bananas(32)
     batch = next(iter(train_iter))
+    # batch[0]: (batch_size, C, H, W)
+    # batch[1]: (batch_size, 1, 5)
     print(batch[0].shape, batch[1].shape)
+
+    # 用matplotlib可视化前10张图片
+    import matplotlib.pyplot as plt
+    fig, axes = plt.subplots(2, 5, figsize=(12, 6))
+    for i in range(10):
+        ax = axes[i // 5, i % 5]
+        img = batch[0][i].permute(1, 2, 0).numpy() / 255.0  # (H, W, C)
+        h, w, _ = img.shape
+        scale = torch.tensor([w, h, w, h])
+
+        gt_class = batch[1][i][0][0] # tensor
+        gt_box = batch[1][i][0][1:] # tensor
+        # 绘制真实框
+        show_boxes(ax, gt_box * scale.unsqueeze(0), linewidth=1, colors=['red'])
+        ax.set_title(f'class:{int(gt_class.item())}')
+        ax.imshow(img)
+        ax.axis('off')
+    plt.tight_layout()
+    plt.show()
 
