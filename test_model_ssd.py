@@ -173,7 +173,6 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
         batch_size = batch_pred_classes.shape[0]
         num_classes = num_classes + 1
         cls = cls_loss(batch_pred_classes.reshape(-1, num_classes), batch_assigned_classes.reshape(-1)).reshape(batch_size, -1).mean(dim=1)
-        print(batch_pred_classes.shape, batch_assigned_mask.shape, batch_assigned_offset.shape)
         bbox = bbox_loss(batch_pred_offset * batch_assigned_mask, batch_assigned_offset * batch_assigned_mask).mean(dim=1)
         # 而边界框回归只对正样本有意义（只有正样本才有真实的边界框偏移量）
         # (B)

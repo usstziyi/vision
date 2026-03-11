@@ -131,6 +131,9 @@ def anchor_to_label(anchors, labels):
     # 类别：batch_assigned_classes(B,NAC):(c1,c2,c3,0,0,0,c4,c5,...)
     # 偏移量：batch_assigned_offset(B,4*NAC):(tx1,ty1,tw1, th1, tx2, ty2, tw2, th2, ...)
     # 掩码：batch_assigned_mask(B,4*NAC):(1,1,1,1,0,0,0,0,1,1,1,1,...)
+    print("batch_assigned_classes:",batch_assigned_classes.shape)
+    print("batch_assigned_offset:",batch_assigned_offset.shape)
+    print("batch_assigned_mask:",batch_assigned_mask.shape)
     return (batch_assigned_classes, batch_assigned_offset, batch_assigned_mask)
 
 
