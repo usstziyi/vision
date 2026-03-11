@@ -275,7 +275,7 @@ def main():
         net.load_state_dict(torch.load('./pth/tiny_ssd_model.pth', map_location=device))
         print('已加载预训练模型 ./pth/tiny_ssd_model.pth')
         # 预测
-        # return 
+        return 
     except FileNotFoundError:
         print('未找到预训练模型，将从头开始训练')
 
