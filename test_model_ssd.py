@@ -13,7 +13,8 @@ def concat_preds(preds):
     return torch.cat(list_preds, dim=1)   # 拼接
 
 # 分类预测器
-# return(B,C,H,W)
+# 输入(B,C_in,H,W)
+# 输出(B,C_out,H,W)
 def cls_predictor(num_inputs, num_anchors, num_classes):
     return nn.Conv2d(num_inputs,                       # 输入通道数
                      num_anchors * (num_classes + 1),  # 输出通道数：每个锚框预测 num_classes+1 个值
@@ -22,7 +23,8 @@ def cls_predictor(num_inputs, num_anchors, num_classes):
 
 
 # 边界框回归预测器
-# return(B,C,H,W)
+# 输入(B,C_in,H,W)
+# 输出(B,C_out,H,W)
 def bbox_predictor(num_inputs, num_anchors):
     return nn.Conv2d(num_inputs,                       # 输入通道数
                      num_anchors * 4,                  # 输出通道数：每个锚框预测 4 个值（偏移量）
@@ -31,9 +33,12 @@ def bbox_predictor(num_inputs, num_anchors):
 
 
 # 下采样块：卷积层+批量归一化+ReLU+最大池化
-# Conv -> BN -> ReLU -> MaxPool2d
-# 这个函数就是一个“特征提取器 + 压缩器”，
+# 双卷积：Conv -> BN -> ReLU 
+# 下采样：MaxPool2d
+# 这个函数就是一个“特征提取器 + 压缩器”
 # 用于将高分辨率、低通道的特征图，逐步转化为低分辨率、高通道的深层语义特征。
+# 输入(N,C_in,H,W)
+# 输出(N,C_out,H/2,W/2)
 def down_sample_blk(in_channels, out_channels):
     blk = []
     for _ in range(2):
@@ -47,6 +52,7 @@ def down_sample_blk(in_channels, out_channels):
 
 
 # 基本网络块：三次 down_sample_blk
+# 分辨率在下降，通道数在上升
 def base_blk():
     blk = []
     blk.append(down_sample_blk(3, 16))
@@ -71,23 +77,23 @@ class TinySSD(nn.Module):
 
 
 
-        self.blk0 = base_blk()
+        self.blk0 = base_blk() # 三次 down_sample_blk
         self.cls0 = cls_predictor(64, self.num_anchors[0], self.num_classes)
         self.bbox0 = bbox_predictor(64, self.num_anchors[0])
 
-        self.blk1 = down_sample_blk(64, 128)
+        self.blk1 = down_sample_blk(64, 128) # 一次 down_sample_blk
         self.cls1 = cls_predictor(128, self.num_anchors[1], self.num_classes)
         self.bbox1 = bbox_predictor(128, self.num_anchors[1])
         
-        self.blk2 = down_sample_blk(128, 128)
+        self.blk2 = down_sample_blk(128, 128) # 一次 down_sample_blk
         self.cls2 = cls_predictor(128, self.num_anchors[2], self.num_classes)
         self.bbox2 = bbox_predictor(128, self.num_anchors[2])
         
-        self.blk3 = down_sample_blk(128, 128)
+        self.blk3 = down_sample_blk(128, 128) # 一次 down_sample_blk
         self.cls3 = cls_predictor(128, self.num_anchors[3], self.num_classes)
         self.bbox3 = bbox_predictor(128, self.num_anchors[3])
         
-        self.blk4 = nn.AdaptiveAvgPool2d(output_size=(1, 1))
+        self.blk4 = nn.AdaptiveAvgPool2d(output_size=(1, 1)) # 平均池化层：(B,C,H,W)->(B,C,1,1)
         self.cls4 = cls_predictor(128, self.num_anchors[4], self.num_classes)
         self.bbox4 = bbox_predictor(128, self.num_anchors[4])
 
@@ -98,34 +104,40 @@ class TinySSD(nn.Module):
 
         anchors, cls_preds, bbox_preds = [None] * 5, [None] * 5, [None] * 5
 
-        X = self.blk0(X)
+        X = self.blk0(X) # 生成特征图
         anchors[0] = generate_anchors(X, self.sizes[0], self.ratios[0])
         cls_preds[0] = self.cls0(X)
         bbox_preds[0] = self.bbox0(X)
 
-        X = self.blk1(X)
+        X = self.blk1(X) # 继续生成特征图
         anchors[1] = generate_anchors(X, self.sizes[1], self.ratios[1])
         cls_preds[1] = self.cls1(X)
         bbox_preds[1] = self.bbox1(X)
 
-        X = self.blk2(X)
+        X = self.blk2(X) # 继续生成特征图
         anchors[2] = generate_anchors(X, self.sizes[2], self.ratios[2])
         cls_preds[2] = self.cls2(X)
         bbox_preds[2] = self.bbox2(X)
 
-        X = self.blk3(X)
+        X = self.blk3(X) # 继续生成特征图
         anchors[3] = generate_anchors(X, self.sizes[3], self.ratios[3])
         cls_preds[3] = self.cls3(X)
         bbox_preds[3] = self.bbox3(X)
 
-        X = self.blk4(X)
+        X = self.blk4(X) # 继续生成特征图
         anchors[4] = generate_anchors(X, self.sizes[4], self.ratios[4])
         cls_preds[4] = self.cls4(X)
         bbox_preds[4] = self.bbox4(X)
 
         # 拼接
+        # (1,N(H*W+...),4)
+        anchors_pack = torch.cat(anchors, dim=1)
+        # (B,(H*W+...)*C)
+        cls_preds_pack = concat_preds(cls_preds)
+        # (B,(H*W+...)*4)
+        bbox_preds_pack = concat_preds(bbox_preds)
         
-        return (anchors, cls_preds, bbox_preds)
+        return (anchors_pack, cls_preds_pack, bbox_preds_pack)
 
 
 
