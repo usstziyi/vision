@@ -202,11 +202,12 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
             l.mean().backward()
             # 更新参数
             optimizer.step()
-            # 计算分类准确率和边界框回归准确率
-            metric.add(eval_class(batch_pred_classes, batch_assigned_classes, num_classes), batch_assigned_classes.numel(), eval_offset(batch_pred_offset, batch_assigned_offset, batch_assigned_mask), batch_assigned_offset.numel())
 
-            # 打印损失值
+        
+            # 切断梯度计算
             with torch.no_grad():
+                # 计算分类准确率和边界框回归准确率
+                metric.add(eval_class(batch_pred_classes, batch_assigned_classes, num_classes), batch_assigned_classes.numel(), eval_offset(batch_pred_offset, batch_assigned_offset, batch_assigned_mask), batch_assigned_offset.numel())
                 print(f"batch loss: {l.mean().item():.6f}")
         
         class_err = 1 - metric[0] / metric[1]
@@ -274,7 +275,7 @@ def main():
         net.load_state_dict(torch.load('./pth/tiny_ssd_model.pth', map_location=device))
         print('已加载预训练模型 ./pth/tiny_ssd_model.pth')
         # 预测
-        return 
+        # return 
     except FileNotFoundError:
         print('未找到预训练模型，将从头开始训练')
 
