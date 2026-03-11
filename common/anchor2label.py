@@ -107,14 +107,11 @@ def anchor_to_label(anchors, labels):
         # 计算锚框到真实框的偏移量
         assigned_offset = offset_boxes(anchors, assigned_bboxes) * assigned_mask.unsqueeze(-1)
 
-
-  
-    
         # 拼接本batch所有样本的结果
         # class_labels(NAC,):(c1,c2,c3,0,0,0,c4,c5,...)
         list_assigned_classes.append(assigned_classes)
         # offset.reshape(-1):(4*NAC,):(tx1,ty1,tw1, th1, tx2, ty2, tw2, th2, ...)
-        list_assigned_offset.append(assigned_offset)
+        list_assigned_offset.append(assigned_offset.reshape(-1))
         # bbox_mask.reshape(-1):(4*NAC,):(1,1,1,1,0,0,0,0,1,1,1,1,...)
         list_assigned_mask.append(assigned_mask.reshape(-1))
 
@@ -125,15 +122,15 @@ def anchor_to_label(anchors, labels):
     # batch_assigned_offset(B,4*NAC):(tx1,ty1,tw1, th1, tx2, ty2, tw2, th2, ...)
     batch_assigned_offset = torch.stack(list_assigned_offset, dim=0)
     # batch_assigned_mask(B,4*NAC):(1,1,1,1,0,0,0,0,1,1,1,1,...)
-    batch_assigned_mask = torch.stack(list_assigned_mask, dim=0)
+    batch_assigned_mask = torch.stack(list_assigned_mask, dim=0).repeat(1, 4)
 
     # 每个锚框是否对应真实边界框的掩码
     # 类别：batch_assigned_classes(B,NAC):(c1,c2,c3,0,0,0,c4,c5,...)
     # 偏移量：batch_assigned_offset(B,4*NAC):(tx1,ty1,tw1, th1, tx2, ty2, tw2, th2, ...)
     # 掩码：batch_assigned_mask(B,4*NAC):(1,1,1,1,0,0,0,0,1,1,1,1,...)
-    print("batch_assigned_classes:",batch_assigned_classes.shape)
-    print("batch_assigned_offset:",batch_assigned_offset.shape)
-    print("batch_assigned_mask:",batch_assigned_mask.shape)
+    # (32,10760)
+    # (32,21520)
+    # (32,21520)
     return (batch_assigned_classes, batch_assigned_offset, batch_assigned_mask)
 
 

@@ -146,6 +146,10 @@ class TinySSD(nn.Module):
         batch_pred_classes = concat_preds(cls_preds)
         # (B,(H*W+...)*C_out)
         batch_pred_offset = concat_preds(bbox_preds)
+
+        # (1,5380,4)
+        # (32,10760)
+        # (32,21520)
         # 把类别数也返回
         return (batch_anchors, batch_pred_classes, batch_pred_offset, self.num_classes)
 
@@ -192,10 +196,10 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
             # 计算损失函数(分类损失+回归损失)
             l = calc_loss(batch_pred_classes, batch_pred_offset, batch_assigned_classes, batch_assigned_offset, batch_assigned_mask, num_classes)
             # 反向传播和优化
-            l.backward().mean().backward()
+            l.mean().backward()
             # 更新参数
             optimizer.step()
-            print("epoch:",i)
+        print("epoch:",i)
 
 
 
