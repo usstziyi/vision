@@ -8,9 +8,9 @@ from .pre import multibox_detection
 from .generate_anchor import generate_anchors
 from .generate_anchor import generate_anchors_by_feature_map
 from .tiny_ssd import TinySSD
-from .displaymodel import display_model 
 from .pre import multibox_detection
-from .offset import anchor_label,offset_boxes,offset_inverse
+from .anchor2label import anchor_to_label,offset_boxes,offset_inverse
+from .dataset import load_data_bananas
 
 
 
@@ -30,8 +30,8 @@ __all__ = [
     'multibox_detection',
     'generate_fmap_anchors',
     'TinySSD',
-    'display_model',
     'multibox_detection',
-    'anchor_label'
+    'anchor_to_label',
+    'load_data_bananas'
 
 ]

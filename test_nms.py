@@ -1,6 +1,6 @@
 import torch
 import matplotlib.pyplot as plt
-from common import show_boxes, anchor_label, multibox_detection, offset_inverse
+from common import show_boxes, anchor_to_label, multibox_detection, offset_inverse
 
 torch.set_printoptions(2)  # 恢复默认打印精度
 # anchors(NAC, 4)

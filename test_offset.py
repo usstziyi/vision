@@ -1,6 +1,6 @@
 import torch
 import matplotlib.pyplot as plt
-from common import show_boxes, anchor_label
+from common import show_boxes, anchor_to_label
 
 # ground_truth(B,5):(class_index,xmin,ymin,xmax,ymax)
 ground_truth = torch.tensor([[0, 0.1, 0.08, 0.52, 0.92],
@@ -27,7 +27,7 @@ show_boxes(fig.axes, anchors * bbox_scale, ['0', '1', '2', '3', '4'], linewidth=
 anchors = anchors.unsqueeze(dim=0)
 ground_truth = ground_truth.unsqueeze(dim=0)
 
-labels = anchor_label(anchors, ground_truth)
+labels = anchor_to_label(anchors, ground_truth)
 
 plt.show()
 

@@ -1,5 +1,5 @@
 import torch
-from .offset import offset_inverse
+from .anchor2label import offset_inverse
 from .nms import nms
 
 """
