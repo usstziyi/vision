@@ -183,6 +183,7 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
         return cls + bbox
     
     for i in range(num_epochs):
+        metric = Accumulator(4)
         net.train()
         for image, target in train_iter:
             optimizer.zero_grad()
@@ -199,14 +200,61 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
             l.mean().backward()
             # 更新参数
             optimizer.step()
-        print("epoch:",i)
+            # 计算分类准确率和边界框回归准确率
+            metric.add(eval_class(batch_pred_classes, batch_assigned_classes, num_classes), batch_assigned_classes.numel(), eval_offset(batch_pred_offset, batch_assigned_offset, batch_assigned_mask), batch_assigned_offset.numel())
+
+            # 打印损失值
+            with torch.no_grad():
+                print(f"batch loss: {l.mean().item():.6f}")
+        
+        class_err = 1 - metric[0] / metric[1]
+        bbox_mae = metric[2] / metric[3]
+        print(f"epoch {i + 1}:" f"class err: {class_err:.6f}, bbox mae: {bbox_mae:.6f}")
+
+# 评估分类准确率
+def eval_class(batch_pred_classes,batch_assigned_classes,num_classes):
+    # (B,num_anchors*num_classes+1)->(B,num_anchors,num_classes+1)
+    batch_pred_classes = batch_pred_classes.reshape(batch_pred_classes.shape[0], -1, num_classes + 1)
+    # (B,num_anchors,num_classes+1)->(B,num_anchors)
+    batch_pred_classes = batch_pred_classes.argmax(dim=-1)
+    return float((batch_pred_classes.type(batch_assigned_classes.dtype) == batch_assigned_classes).sum())
+# 评估offset准确率
+def eval_offset(batch_pred_offset,batch_assigned_offset,batch_assigned_mask):
+    return float((torch.abs((batch_pred_offset - batch_assigned_offset) * batch_assigned_mask)).sum())
+
+class Accumulator:
+    """For accumulating sums over `n` variables."""
+    def __init__(self, n):
+        """Defined in :numref:`sec_softmax_scratch`"""
+        self.data = [0.0] * n
+
+    def add(self, *args):
+        self.data = [a + float(b) for a, b in zip(self.data, args)]
+
+    def reset(self):
+        self.data = [0.0] * len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx]
+
+
+
+
+
+
+
+
 
 
 
 
 
 def main():
+    # 设置打印选项，保留两位小数
+    torch.set_printoptions(precision=2) 
     # 设置超参数
+    num_epochs = 20
+    batch_size = 32
     # 获取可用设备
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'Using device: {device}')
@@ -228,9 +276,23 @@ def main():
     # 打印模型结构
     # display_model(net)
 
+    # 加载模型（若存在则加载，否则从头训练）
+    try:
+        net.load_state_dict(torch.load('./pth/tiny_ssd_model.pth', map_location=device))
+        print('已加载预训练模型 ./pth/tiny_ssd_model.pth')
+        # 预测
+        return 
+    except FileNotFoundError:
+        print('未找到预训练模型，将从头开始训练')
+
 
     # 训练模型
-    train_tinyssd(net, train_iter, device, num_epochs=20)
+    train_tinyssd(net, train_iter, device, num_epochs)
+
+    # 保存模型
+    torch.save(net.state_dict(), './pth/tiny_ssd_model.pth')
+    print('模型已保存至 ./pth/tiny_ssd_model.pth')
+
 
 
     # # 评估模型
