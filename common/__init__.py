@@ -2,7 +2,6 @@
 from .ralative2pixel import relative_to_pixel
 from .iou import box_iou 
 from .nms import nms
-from .show_boxes import show_boxes,display
 from .assign import assign_anchor_to_bbox
 from .pre import multibox_detection
 from .generate_anchor import generate_anchors

@@ -5,7 +5,6 @@ from torch.nn import functional as F
 from d2l import torch as d2l
 from common import TinySSD
 from common import multibox_detection
-from common import display
 import matplotlib.pyplot as plt
 
 # anchors   (1,(H*W+...)*num_anchors,4):锚框生成器

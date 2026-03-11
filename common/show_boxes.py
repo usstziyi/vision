@@ -38,31 +38,4 @@ def show_boxes(axes, boxes, labels=None,linewidth=2, colors=None):
                       fontsize=9,          # 字体大小
                       color=text_color,    # 字体颜色（与边界框颜色形成对比）
                       bbox=bounding_box)   # 文本背景框样式字典
-
-
-
-
-
-
-def display(img, output, threshold):
-    h, w = img.shape[0:2]
-    boxes = []
-    labels = [] 
-
-    # 显示背景图
-    fig, axes = plt.subplots()
-    axes.imshow(img)
-
-    # 遍历所有预测框
-    for row in output:
-        score = float(row[1])
-        # 过滤掉低置信度的框
-        if score < threshold:
-            continue
-        box = row[2:6] * torch.tensor((w, h, w, h), device=row.device)
-        boxes.append(box)
-        #'%.2f' % score 是Python中的字符串格式化语法，将浮点数格式化为保留两位小数的字符串
-        labels.append('%.2f' % score)
-    # 显示所有框
-    show_boxes(axes, boxes, labels,linewidth=2)
-    plt.show()  
+                      
