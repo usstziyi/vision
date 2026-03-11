@@ -6,7 +6,6 @@ from .show_boxes import show_boxes,display
 from .assign import assign_anchor_to_bbox
 from .pre import multibox_detection
 from .generate_anchor import generate_anchors
-from .generate_anchor import generate_anchors_by_feature_map
 from .tiny_ssd import TinySSD
 from .pre import multibox_detection
 from .anchor2label import anchor_to_label,offset_boxes,offset_inverse
@@ -20,7 +19,6 @@ __all__ = [
     'offset_inverse',
     'offset_boxes',  
     'generate_anchors',
-    'generate_anchors_by_feature_map',
     'relative_to_pixel',
     'show_anchors','display',
     'box_iou',

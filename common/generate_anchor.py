@@ -87,12 +87,3 @@ def generate_anchors(picture, sizes, ratios):
     return bbox_logic.unsqueeze(0)
 
 
-# 通过特征图生成锚框(内部还是调用generate_anchors)
-def generate_anchors_by_feature_map(fmap_w, fmap_h, scales, ratios=[1, 2, 0.5]):
-    # 前两个维度上的值不影响输出
-    # 等效特征图(B, C, h, w)
-    fmap = torch.zeros((1, 3, fmap_h, fmap_w)) # 影子张量
-    # 在特征图上生成锚框:归一化坐标
-    anchors = generate_anchors(fmap, scales, ratios)
-    # 输出：(1, bpp*h*w, 4)
-    return anchors

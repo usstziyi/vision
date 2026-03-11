@@ -240,15 +240,6 @@ class Accumulator:
 
 
 
-
-
-
-
-
-
-
-
-
 def main():
     # 设置打印选项，保留两位小数
     torch.set_printoptions(precision=2) 
