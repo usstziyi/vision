@@ -6,9 +6,9 @@ from .assign import assign_anchor_to_bbox
 from .pre import multibox_detection
 from .generate_anchor import generate_anchors
 from .tiny_ssd import TinySSD
-from .pre import multibox_detection
 from .anchor2label import anchor_to_label,offset_boxes,offset_inverse
 from .dataset import load_data_bananas
+from .show_boxes import show_boxes
 
 
 
@@ -27,7 +27,6 @@ __all__ = [
     'multibox_detection',
     'generate_fmap_anchors',
     'TinySSD',
-    'multibox_detection',
     'anchor_to_label',
     'load_data_bananas'
 

@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 import torchvision.io as tv_io
+from torch.nn import functional as F
 from common import generate_anchors
 from common import load_data_bananas
 from common import anchor_to_label
@@ -117,7 +118,7 @@ class TinySSD(nn.Module):
         anchors, cls_preds, bbox_preds = [None] * 5, [None] * 5, [None] * 5
 
         X = self.blk0(X) # 生成特征图
-        anchors[0] = generate_anchors(X, self.sizes[0], self.ratios[0])
+        anchors[0] = generate_anchors(X, self.sizes[0], self.ratios[0]) # (1,P*A,4)
         cls_preds[0] = self.cls0(X)
         bbox_preds[0] = self.bbox0(X)
 
@@ -142,14 +143,14 @@ class TinySSD(nn.Module):
         bbox_preds[4] = self.bbox4(X)
 
         # 拼接多尺度层的锚框、分类、边框偏移量
-        # (1,N(H*W+...),4)
+        # (1,P*A,4)
         batch_anchors = torch.cat(anchors, dim=1)
-        # (B,(H*W+...)*C_out)
+        # (B,P*A*C)
         batch_pred_classes = concat_preds(cls_preds)
-        # (B,(H*W+...)*C_out)
+        # (B,P*A*4)
         batch_pred_offset = concat_preds(bbox_preds)
 
-        # batch_anchors(B,P*A,4)
+        # batch_anchors(1,P*A,4)
         # batch_pred_classes(B,P*A*C)
         # batch_pred_offset(B,P*A*4)
         # 把类别数也返回
@@ -190,7 +191,7 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
             image = image.to(device) # (B,C,H,W)
             target = target.to(device) # (B,1,5)
             # 模型算出锚框、分类、边框偏移量
-            # batch_anchors(B,P*A,4)
+            # batch_anchors(1,P*A,4)
             # batch_pred_classes(B,P*A*C)
             # batch_pred_offset(B,P*A*4)
             batch_anchors, batch_pred_classes, batch_pred_offset, num_classes = net(image)
@@ -250,14 +251,14 @@ def predict_tinyssd(net, img, device):
     net.eval()
     with torch.no_grad():
         img = img.to(device)
-        # batch_anchors(B,P*A,4)
+        # batch_anchors(1,P*A,4)
         # batch_pred_classes(B,P*A*C)
         # batch_pred_offset(B,P*A*4)
         batch_anchors, batch_pred_classes, batch_pred_offset, num_classes = net(img)
-        print("batch_anchors:", batch_anchors.shape)
-        print("batch_pred_classes:", batch_pred_classes.shape)
-        print("batch_pred_offset:", batch_pred_offset.shape)
-        print("num_classes:", num_classes)
+        # (B,P*A,C)
+        batch_pred_classes = batch_pred_classes.reshape(batch_pred_classes.shape[0],-1,num_classes)
+        F.softmax(batch_pred_classes, dim=-1)
+
 
 
 

@@ -83,7 +83,7 @@ def generate_anchors(picture, sizes, ratios):
     # bbox_logic                        (bpp*h*w, 4)
     # (左上角x, 左上角y, 右下角x, 右下角y)
     bbox_logic = bbox_center_logic_grid + bbox_w_h_half_logic
-    # 输出：(1, bpp*h*w, 4)
+    # 输出：(1, P*A, 4)
     return bbox_logic.unsqueeze(0)
 
 
