@@ -1,10 +1,13 @@
 import torch
 from torch import nn
 import torchvision.io as tv_io
-from torch.nn import functional as F
+import matplotlib.pyplot as plt
+import numpy as np
 from common import generate_anchors
 from common import load_data_bananas
 from common import anchor_to_label
+from common import filter_boxes_by_nms
+from common import show_boxes
 
 
 
@@ -160,6 +163,7 @@ class TinySSD(nn.Module):
 def train_tinyssd(net, train_iter, device, num_epochs=20):
     # 将模型移动到设备
     net.to(device)
+    net.train()
     # 定义损失函数
     cls_loss = nn.CrossEntropyLoss(reduction='none') # 分类损失：交叉熵损失：预测值与标签值的负对数似然损失
     bbox_loss = nn.L1Loss(reduction='none')          # 回归损失：L1范数损失：预测值与标签值的差的绝对值，L1Loss(x,y)=∣x−y∣
@@ -184,7 +188,6 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
     
     for i in range(num_epochs):
         metric = Accumulator(4)
-        net.train()
         for image, target in train_iter:
             optimizer.zero_grad()
             image = image.to(device) # (B,C,H,W)
@@ -244,7 +247,7 @@ class Accumulator:
     def __getitem__(self, idx):
         return self.data[idx]
 
-
+# img(1,C,H,W)
 def predict_tinyssd(net, img, device):
     net.to(device)
     net.eval()
@@ -254,15 +257,33 @@ def predict_tinyssd(net, img, device):
         # batch_pred_classes(B,P*A*C)
         # batch_pred_offset(B,P*A*4)
         batch_anchors, batch_pred_classes, batch_pred_offset, num_classes = net(img)
-        # (B,P*A,C)
-        batch_pred_classes = batch_pred_classes.reshape(batch_pred_classes.shape[0],-1,num_classes)
-        F.softmax(batch_pred_classes, dim=-1)
+        # softmax、NMS处理、筛选出最终保留的框索引
+        # box_info(B,P*A,6):(x1,y1,x2,y2,score,cls)
+        box_info = filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, num_classes)
+        print(box_info.shape)
+        box_info = box_info.squeeze(0)
+        # 打印前100个预测框
+        # print(box_info[:100])
+        # 去掉置信度小于0.9的预测框
+        mask = box_info[:,4] > 0.9
+        box_info = box_info[mask]
+        print(box_info[:100])
+        # 显示预测框
+        H, W = img.shape[2:]
 
+        fig,axes = plt.subplots(1,1)
+        axes.imshow(img)
+        
+
+        show_boxes(axes, box_info[:, :4]*torch.tensor((W, W, H, W), dtype=torch.float32,device=device), box_info[:, 5].tolist())
+        plt.show()
+    
 
 
 
 def main():
-    torch.set_printoptions(precision=6)     # 保留6位小数
+    # 设置打印选项
+    torch.set_printoptions(precision=6)     # 保留2位小数
     torch.set_printoptions(sci_mode=False)  # 禁用科学计数法
     # 设置超参数
     num_epochs = 20
@@ -305,13 +326,15 @@ def main():
 
     # 预测
     print('开始进行预测...')
+    # img(1,C,H,W)
     img = tv_io.read_image('./img/banana.jpg').unsqueeze(0).float()
-    print(img.shape)
     predict_tinyssd(net, img, device)
+
+
+
+
 
 
 if __name__ == '__main__':
     main()
-
-
 

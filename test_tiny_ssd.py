@@ -222,7 +222,6 @@ def main():
     # 打印模型结构
     # display_model(net)
 
-
     # 训练模型
     train_tinyssd(net, train_iter, device, num_epochs=20)
 

@@ -1,52 +1,55 @@
 import torch
+from torch.nn import functional as F
 from .iou import box_iou
-from .anchor2label import offset_inverse
+from .anchor_shift import anchor_shift
 '''
     非极大值抑制非极大值抑制:删除置信度接近的锚框
     保留置信度最高的检测框，并抑制与其高度重叠（即交并比 IoU 较大）的其他检测框。
 '''
 
 
-# 非极大值抑制
-# boxes: (N, 4)  N个边界框，每个框4个坐标
-# scores: (N,)   每个边界框的置信度得分
+# 非极大值抑制(1张图中所有特征图中所有预测框的NMS处理，非批量)
+# pred_boxes: (P*A,4)
+# pred_score: (P*A,) :每个预测框的最大前景概率
 # iou_threshold: 抑制阈值
 # 混合类别的 NMS
-def nms(boxes, scores, iou_threshold):
+def nms(pred_boxes, pred_score, iou_threshold):
     # 对预测边界框的置信度进行排序
-    # B: (N,)  按置信度降序排列的索引:从高到低
-    sorted_score = torch.argsort(scores, dim=-1, descending=True)  
-    keep_indices = []  # 保留预测边界框的指标
+    # sorted_boxes(P*A,)  按置信度降序排列的索引:从高到低
+    # 保留了原始序列
+    sorted_boxes = torch.argsort(pred_score, descending=True)  
+    keep_indices = []  # 保存原始序列
 
     # NMS
-    while sorted_score.numel() > 0:# 当待处理框数量大于0时，继续处理
-        # 本轮最高置信框索引
-        max_indices = sorted_score[0]
-        rest_indices = sorted_score[1:]
+    # 挨个处理预测框
+    while sorted_boxes.numel() > 0:
+        max_indices = sorted_boxes[0]   # 最大置信度的索引
+        rest_indices = sorted_boxes[1:] # 剩余索引
         # 保留当前最高置信框索引
         keep_indices.append(max_indices)
         # 如果只剩一个框，直接跳出循环
-        if sorted_score.numel() == 1: 
+        if sorted_boxes.numel() == 1: 
             break
 
-
-        
-        # 取出当前最高置信框
-        current_box = boxes[max_indices, :].reshape(-1, 4)          # (1, 4)
-        # 取出剩余待比较框
-        rest_boxes = boxes[rest_indices, :].reshape(-1, 4)       # (N-1, 4)
-        # 计算两两 IoU(1,N-1)->(N-1,)
-        # (0,1,2,3,4)
-        # (0-1,0-2,0-3,0-4)
-        iou = box_iou(current_box, rest_boxes).reshape(-1)  # (N-1,)
+        # head_box(1,4)
+        head_box = pred_boxes[max_indices, :].reshape(-1, 4)
+        # rest_boxes(P*A-1,4)
+        rest_boxes = pred_boxes[rest_indices, :].reshape(-1, 4)
+        # 计算两两 IoU
+        # iou(P*A-1,)
+        iou = box_iou(head_box, rest_boxes).reshape(-1)
         # 筛选出 IoU 小于阈值的框自然索引
-        inds = torch.nonzero(iou <= iou_threshold).reshape(-1)  # inds: (M,)  保留的索引，M <= N-1
+        # survive_indices(S,)
+        survive_indices = torch.nonzero(iou <= iou_threshold).reshape(-1)
         # 转换为总绝对索引
-        inds = inds + 1
+        survive_indices = survive_indices + 1
         # 下一轮参与NMS的框索引
-        sorted_score = sorted_score[inds]
-
-    return torch.tensor(keep_indices, device=boxes.device)  # (K,)  K为最终保留的框数量
+        sorted_boxes = sorted_boxes[survive_indices]
+    
+    # keep_indices(K,):从P*A中筛选出最终保留的框索引
+    keep_indices = torch.tensor(keep_indices, device=pred_boxes.device)
+    # keep_indices(K,) :保留的原始序列索引
+    return keep_indices
 
 
 # pytorch自带的nms函数
@@ -77,130 +80,100 @@ def nms(boxes, scores, iou_threshold):
     - 其余990个锚框与猫无重叠(标记为类别0,即背景)
     - 在NMS后,一些低置信度的预测被标记为-1(忽略):这些锚框不是背景，是被丢弃的低质量前景
 """
-# 用于测试阶段
-def filter_boxes_by_nms(pred_classes,       # cls_probs(B, NCLS, 锚框总数)：每个锚框的类别概率,包括背景0类别的概率
-                       offset_preds,    # offset_preds(B, NAC*4)：每个锚框的偏移量预测
-                       anchors,         # anchors(1, 锚框总数, 4):锚框生成器
-                       nms_threshold=0.5,      # 非极大值抑制的IoU阈值，高于此阈值的重复框会被抑制
-                       pos_threshold=0.009999999):  # 正类置信度阈值，低于此值的预测会被视为背景
-    
-    device = pred_classes.device
-
-    batch_size = pred_classes.shape[0]
-    num_classes = pred_classes.shape[1]
-    num_anchors = pred_classes.shape[2] # 锚框总数
+# 预测阶段用(可批量)
+# batch_anchors(1,P*A,4)
+# batch_pred_classes(B,P*A*C)
+# batch_pred_offset(B,P*A*4)
+def filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, num_classes):    
+    nms_threshold=0.5         # 重叠框,置为背景
+    pos_threshold=0.009999999 # 得分低的框，置位背景
+    device = batch_pred_classes.device
 
     # anchors(1, NAC, 4) -> anchors(NAC, 4)
-    anchors = anchors.squeeze(0)
+    anchors = batch_anchors.squeeze(0)
+    # (B,P*A,C)
+    batch_pred_classes = batch_pred_classes.reshape(batch_pred_classes.shape[0],-1,num_classes)
+    batch_pred_offset = batch_pred_offset.reshape(batch_pred_offset.shape[0],-1,4)
+
+
+    # softmax
+    # 从“分数”到“概率”
+    # (B,P*A,C) 
+    batch_pred_classes = F.softmax(batch_pred_classes, dim=-1)
+
+    
+    batch_size = batch_pred_classes.shape[0]
+    num_anchors = batch_pred_classes.shape[1]
+    num_classes = batch_pred_classes.shape[2]
 
 
 
-    list_pred_info = []
+
+    list_box_info = []
     for i in range(batch_size):
-        # cls_prob(NCLS, 锚框总数)
-        cls_prob = pred_classes[i]
-        # cls_prob[0]  通常表示背景类的概率
-        # cls_prob[1:] 表示除了背景类的所有物体类别的概率
-        # torch.max dim=0
-        # 给每个anchor找到最大的类别概率和对应的类别索引
-        # scores(NAC):每个anchor的最大类别概率
-        # class_id(NAC):每个anchor的最大类别索引
-        # 我们希望找到每个锚框最有可能属于哪个具体的物体类别（如猫、狗等）
-        # 背景类别（0）只是用来标识"这里没有物体"，不需要参与物体类别的竞争
-        # 后续处理的逻辑：
-        # - 如果一个锚框的最大物体类别概率仍然很低（低于pos_threshold），则认为它是背景
-        # - 这种设计允许模型明确区分三种状态：
-        # - 明确检测到某个物体类别（高置信度）
-        # - 确定是背景（低置信度）
-        # - 不确定/忽略（通过NMS抑制或置信度过低设为-1）
-        # 先判断是否有物体，再判断是什么物体
-        # 这里的class_id0对应前景，不是背景
-        # class_id 中的 0 对应 cls_prob[1] （第一个物体类别）
-        # class_id 中的 1 对应 cls_prob[2] （第二个物体类别）
-        # 举例：假设我们有3个物体类别：背景、狗、猫
-        # 更符合实际情况的类别概率分布
-        # cls_prob = torch.tensor([
-        #     [0.9,  0.2,  0.1,  0.05],  # 背景类概率 (通常较高)
-        #     [0.05, 0.7,  0.2,  0.03],  # 猫类概率
-        #     [0.05, 0.1,  0.7,  0.92]   # 狗类概率
-        # ])
-        # cls_prob[1:] 切片后：
-        # [
-        #     [0.05, 0.7,  0.2,  0.03],  # 猫类概率
-        #     [0.05, 0.1,  0.7,  0.92]   # 狗类概率
-        # ]
-        # torch.max 结果：
-        # scores = [0.05, 0.7, 0.7, 0.92]  # 每个锚框的最大物体类别概率
-        # class_id = [0, 0, 1, 1]           # 对应的类别索引（相对于切片后）
-        # 实际类别映射：
-        # 锚框0: 最可能是猫(类别1)，置信度0.05
-        # 锚框1: 最可能是猫(类别1)，置信度0.7
-        # 锚框2: 最可能是狗(类别2)，置信度0.7
-        # 锚框3: 最可能是狗(类别2)，置信度0.92
-        # 我们只关注前景类别的概率（索引1及以上）
-        # scores(锚框总数):模型预测的目标锚框的类别概率(最大)
-        # class_id(锚框总数):模型预测的目标锚框的类别索引
-        # 背景类不应该与物体类别竞争
-        # 后续处理 ：在后续代码中会有专门的逻辑处理背景情况：
-        scores, class_id = torch.max(cls_prob[1:], dim=0)
+        pred_classes = batch_pred_classes[i] # (P*A,C)
+        pred_offset = batch_pred_offset[i] # (P*A,4)
 
+        # 0 1 2 3 4 5   pred_score class_id
+        # * * * * * *  -> *         2
+        # * * * * * *  -> *         1
+        # * * * * * *  -> *         3
+        # * * * * * *  -> *         0
+        # * * * * * *  -> *         4
+        # * * * * * *  -> *         5
+        # * * * * * *  -> *         5
+        # * * * * * *  -> *         2
+        # * * * * * *  -> *         3
+        # * * * * * *  -> *         4
+        # 先假设所有框都是某种物体 -> 算出物体的置信度 -> 用 NMS 去除重叠的物体框 -> 最后把置信度太低的框（其实是背景）扔掉。
+        # pred_score(P*A,)
+        # class_id(P*A,)
+        # 得到原始序列
+        pred_score, class_id = torch.max(pred_classes[:,1:], dim=-1)
 
-        # offset_preds[i](锚框总数*4)
-        # reshape(-1, 4):(锚框总数, 4)
-        # offset_pred(锚框总数, 4)
-        offset_pred = offset_preds[i].reshape(-1, 4)
-        # 把偏移量施加到锚框上，得到预测框
-        # anchors(锚框总数, 4)
-        # offset_pred(锚框总数, 4)
-        # target_anchors(锚框总数, 4):模型预测的目标锚框(相对尺寸)
-        # 把偏移量施加到锚框上，得到预测框(相对尺寸)
-        pred_boxes = offset_inverse(anchors, offset_pred)
-
-
-        # 非极大值抑制：确保了最终输出结果没有冗余重叠框
-        # target_anchors(锚框总数,4):模型预测的目标锚框(相对尺寸)
-        # scores(锚框总数,):模型预测的目标锚框的最大类别概率
-        # keep_indices(R,):保留的anchor索引，R<=锚框总数
-        # 此处的scores里面是多种类型混在一起的分数排名
+        # 移动锚框到预测框
+        # anchors(P*A,4)(xa, ya, wa, ha)
+        # offsets(P*A,4)(dx, dy, dw, dh) (已标准化)
+        # pred_boxes(P*A,4)(xb, yb, wb, hb)
+        pred_boxes = anchor_shift(anchors, pred_offset)
+        # 非极大值抑制
         # 混合类别的 NMS:先定类别，后做NMS,不会出现同一个预测框被分配为两个类别的情况
         # 如果两个重叠很高的框，一个是“猫（0.9）”，一个是“狗（0.8）”。
         # NMS 会保留分数高的“猫”，抑制掉“狗”。
-        keep_indices = nms(pred_boxes, scores, nms_threshold)
+        # keep_indices(K,) :保留的原始序列索引
+        keep_indices = nms(pred_boxes, pred_score, nms_threshold)
 
-        # 找到所有的non_keep索引，并将类设置为背景
-        mask = torch.zeros(num_anchors, dtype=torch.bool, device=device)
-        mask[keep_indices] = True
-        non_keep = torch.where(~mask)[0]
-
-
-        # 重新排列(keep,non_keep),keep+non_keep=所有anchor索引
-        all_id_sorted = torch.cat((keep_indices, non_keep))
-        # 不在keep中的anchor，类别索引下调到-1(丢弃)
+        # 找到所有的non_keep索引，并将类设置为背景(现在是预测阶段)
+        all_indices = torch.arange(num_anchors, dtype=torch.long, device=device)
+        combined = torch.cat((keep_indices, all_indices))
+        # 比如 [0, 2, 0, 1, 2, 3] 
+        # uniques ：所有唯一元素 [0, 1, 2, 3] 
+        # counts ：每个唯一元素在 combined 中出现的次数 [2, 1, 2, 1] 
+        uniques, counts = combined.unique(return_counts=True)
+        # non_keep(P*A-K,)
+        non_keep = uniques[counts == 1]
+        # all_indices(P*A,) 原始序列索引
+        all_indices = torch.cat((keep_indices, non_keep), dim=0)
+        # 把重叠的框设置为背景-1
         class_id[non_keep] = -1
 
+        # 从原始序列中取出对应的置信度和边界框坐标
+        pred_score = pred_score[all_indices]
+        pred_boxes = pred_boxes[all_indices]
+        class_id = class_id[all_indices]
 
-
-        # 按照排序(keep,non_keep)后的索引重新排列class_id数组
-        # 按照排序(keep,non_keep)后的索引重新排列scores数组
-        # 按照排序(keep,non_keep)后的索引重新排列预测框数组
-        class_id = class_id[all_id_sorted]
-        scores = scores[all_id_sorted] 
-        pred_boxes = pred_boxes[all_id_sorted] 
+        # 把低质量的框设置为背景-1
+        below_min_indices = (pred_score < pos_threshold)
+        class_id[below_min_indices] = -1
+        pred_score[below_min_indices] = 1 - pred_score[below_min_indices]
         
-
-        # non_keep中的class_id已经被设为-1(丢弃)
-        # 还需要从keep中筛选出置信度低于阈值的预测框
-        below_min_idx = (scores < pos_threshold)
-        class_id[below_min_idx] = -1
-        scores[below_min_idx] = 1 - scores[below_min_idx]
-
-        # class_id(NAC,1)
-        # scores(NAC,1)
-        # predicted_bb(NAC, 4)
-        # pred_info(NAC, 6):(class_id, scores, pred_boxes)
-        pred_info = torch.cat((class_id.unsqueeze(1), scores.unsqueeze(1), pred_boxes), dim=1)
-        list_pred_info.append(pred_info)
-        # list_pred_info(B, NAC, 6)
-        # 调用 torch.stack(out) 时不指定 dim 参数，
-        # 函数会沿着第 0 维（第一个维度）创建一个新的维度来堆叠输入张量序列
-    return torch.stack(list_pred_info, dim=0)
+        
+        # pred_boxes(P*A, 4)
+        # pred_score(P*A,1)
+        # class_id(P*A,1)
+        # box_info(P*A, 6)
+        box_info = torch.cat((pred_boxes,pred_score.unsqueeze(1),class_id.unsqueeze(1)), dim=1)
+        list_box_info.append(box_info)
+        # batch_box_info(B, P*A, 6)
+        batch_box_info = torch.stack(list_box_info, dim=0)
+    return batch_box_info

@@ -19,7 +19,6 @@ offset_preds = torch.tensor([[0, 0, 0, 0],
 # 预测出的边界框
 pred_bboxes = offset_inverse(anchors, offset_preds)
 
-
 # cls_probs(NCLS, NAC)
 # 预测出的类别(手动)
 pred_classes = torch.tensor([[0,   0,   0,   0],     # 背景的预测概率
