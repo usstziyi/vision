@@ -1,6 +1,6 @@
 import torch
 import matplotlib.pyplot as plt
-from common import show_boxes,multibox_detection, offset_inverse
+from common import show_boxes,nms,filter_boxes_by_nms, offset_inverse
 
 torch.set_printoptions(2)  # 恢复默认打印精度
 # anchors(NAC, 4)
@@ -48,7 +48,7 @@ axes[1].set_title('After NMS')
 # anchors.unsqueeze(dim=0)(1, NAC, 4)
 # output(1, NAC, 6):(class_id, conf, predicted_bb)
 offset_preds = offset_preds.reshape(-1) # (NAC*4)
-output = multibox_detection(pred_classes.unsqueeze(dim=0),
+output = filter_boxes_by_nms(pred_classes.unsqueeze(dim=0),
                             offset_preds.unsqueeze(dim=0),
                             anchors.unsqueeze(dim=0),
                             nms_threshold=0.5)

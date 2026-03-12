@@ -16,7 +16,7 @@ from common import anchor_to_label
 # 输出(B,C_out,H,W)
 def cls_predictor(num_inputs, num_anchors, num_classes):
     return nn.Conv2d(num_inputs,                       # 输入通道数
-                     num_anchors * (num_classes + 1),  # 输出通道数：每个锚框预测 num_classes+1 个值
+                     num_anchors * num_classes,  # 输出通道数：每个锚框预测 num_classes 个值
                      kernel_size=3,                    # 卷积核大小
                      padding=1)                        # 填充大小，保持特征图尺寸不变
 
@@ -84,7 +84,7 @@ class TinySSD(nn.Module):
         self.sizes = sizes
         self.ratios = ratios
         self.classes = classes
-        self.num_classes = len(classes)
+        self.num_classes = len(classes) + 1 # 包含背景类0
         self.num_anchors = []
         for i, (size, ratio) in enumerate(zip(sizes, ratios)):
             print("size:", size, "ratio:", ratio)
@@ -176,7 +176,6 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
     def calc_loss(batch_pred_classes, batch_pred_offset, batch_assigned_classes, batch_assigned_offset, batch_assigned_mask, num_classes):
         # batch_pred_classes (B,(H*W+...)*C_out)
         batch_size = batch_pred_classes.shape[0]
-        num_classes = num_classes + 1
         cls = cls_loss(batch_pred_classes.reshape(-1, num_classes), batch_assigned_classes.reshape(-1)).reshape(batch_size, -1).mean(dim=1)
         bbox = bbox_loss(batch_pred_offset * batch_assigned_mask, batch_assigned_offset * batch_assigned_mask).mean(dim=1)
         # 而边界框回归只对正样本有意义（只有正样本才有真实的边界框偏移量）
@@ -221,9 +220,9 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
 
 # 评估分类准确率
 def eval_class(batch_pred_classes,batch_assigned_classes,num_classes):
-    # (B,num_anchors*num_classes+1)->(B,num_anchors,num_classes+1)
-    batch_pred_classes = batch_pred_classes.reshape(batch_pred_classes.shape[0], -1, num_classes + 1)
-    # (B,num_anchors,num_classes+1)->(B,num_anchors)
+    # (B,num_anchors*num_classes)->(B,num_anchors,num_classes)
+    batch_pred_classes = batch_pred_classes.reshape(batch_pred_classes.shape[0], -1, num_classes)
+    # (B,num_anchors,num_classes)->(B,num_anchors)
     batch_pred_classes = batch_pred_classes.argmax(dim=-1)
     return float((batch_pred_classes.type(batch_assigned_classes.dtype) == batch_assigned_classes).sum())
 # 评估offset准确率
@@ -263,8 +262,8 @@ def predict_tinyssd(net, img, device):
 
 
 def main():
-    # 设置打印选项，保留两位小数
-    torch.set_printoptions(precision=2) 
+    torch.set_printoptions(precision=6)     # 保留6位小数
+    torch.set_printoptions(sci_mode=False)  # 禁用科学计数法
     # 设置超参数
     num_epochs = 20
     batch_size = 32

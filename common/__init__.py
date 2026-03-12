@@ -1,9 +1,8 @@
 
 from .ralative2pixel import relative_to_pixel
 from .iou import box_iou 
-from .nms import nms
+from .nms import nms,filter_boxes_by_nms
 from .assign import assign_anchor_to_bbox
-from .pre import multibox_detection
 from .generate_anchor import generate_anchors
 from .tiny_ssd import TinySSD
 from .anchor2label import anchor_to_label,offset_boxes,offset_inverse
@@ -24,10 +23,10 @@ __all__ = [
     'nms',
     'show_boxes',
     'assign_anchor_to_bbox',
-    'multibox_detection',
     'generate_fmap_anchors',
     'TinySSD',
     'anchor_to_label',
-    'load_data_bananas'
+    'load_data_bananas',
+    'filter_boxes_by_nms'
 
 ]
