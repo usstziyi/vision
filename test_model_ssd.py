@@ -149,23 +149,21 @@ class TinySSD(nn.Module):
         # (B,(H*W+...)*C_out)
         batch_pred_offset = concat_preds(bbox_preds)
 
-        # (1,5380,4)
-        # (32,10760)
-        # (32,21520)
+        # batch_anchors(B,P*A,4)
+        # batch_pred_classes(B,P*A*C)
+        # batch_pred_offset(B,P*A*4)
         # 把类别数也返回
         return (batch_anchors, batch_pred_classes, batch_pred_offset, self.num_classes)
 
 
 def train_tinyssd(net, train_iter, device, num_epochs=20):
+    # 将模型移动到设备
+    net.to(device)
     # 定义损失函数
     cls_loss = nn.CrossEntropyLoss(reduction='none') # 分类损失：交叉熵损失：预测值与标签值的负对数似然损失
     bbox_loss = nn.L1Loss(reduction='none')          # 回归损失：L1范数损失：预测值与标签值的差的绝对值，L1Loss(x,y)=∣x−y∣
     # 定义优化器
     optimizer = torch.optim.SGD(net.parameters(), lr=0.2, weight_decay=5e-4)
-
-    # 将模型移动到设备
-    net = net.to(device)
-
 
     # batch_pred_classes:模型生成的类别
     # batch_pred_offset:模型生成的边界框偏移量
@@ -192,9 +190,15 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
             image = image.to(device) # (B,C,H,W)
             target = target.to(device) # (B,1,5)
             # 模型算出锚框、分类、边框偏移量
+            # batch_anchors(B,P*A,4)
+            # batch_pred_classes(B,P*A*C)
+            # batch_pred_offset(B,P*A*4)
             batch_anchors, batch_pred_classes, batch_pred_offset, num_classes = net(image)
             # 使用锚框和数据集标签算出类别、偏移量、掩码
             # 其实这步就是目标检测和图像分类的区别所在
+            # batch_assigned_classes(B,P*A)
+            # batch_assigned_offset(B,P*A*4)
+            # batch_assigned_mask(B,P*A*4)
             batch_assigned_classes, batch_assigned_offset, batch_assigned_mask = anchor_to_label(batch_anchors, target)
             # 计算损失函数(分类损失+回归损失)
             l = calc_loss(batch_pred_classes, batch_pred_offset, batch_assigned_classes, batch_assigned_offset, batch_assigned_mask, num_classes)
@@ -241,6 +245,20 @@ class Accumulator:
         return self.data[idx]
 
 
+def predict_tinyssd(net, img, device):
+    net.to(device)
+    net.eval()
+    with torch.no_grad():
+        img = img.to(device)
+        # batch_anchors(B,P*A,4)
+        # batch_pred_classes(B,P*A*C)
+        # batch_pred_offset(B,P*A*4)
+        batch_anchors, batch_pred_classes, batch_pred_offset, num_classes = net(img)
+        print("batch_anchors:", batch_anchors.shape)
+        print("batch_pred_classes:", batch_pred_classes.shape)
+        print("batch_pred_offset:", batch_pred_offset.shape)
+        print("num_classes:", num_classes)
+
 
 
 def main():
@@ -257,8 +275,8 @@ def main():
     # 加载数据集
     batch_size = 32
     train_iter, valid_iter = load_data_bananas(batch_size)
-    # feature: torch.Size([32, 3, 256, 256])
-    # label: torch.Size([32, 1, 5])
+    # image: torch.Size([32, 3, 256, 256])
+    # target: torch.Size([32, 1, 5])
 
 
 
@@ -267,6 +285,7 @@ def main():
     ratios = [[1, 2, 0.5], [1, 2, 0.5], [1, 2, 0.5], [1, 2, 0.5], [1, 2, 0.5]]
     classes = ['banana']
     net = TinySSD(sizes, ratios, classes)
+    net.to(device)
     # 打印模型结构
     # display_model(net)
 
@@ -274,35 +293,21 @@ def main():
     try:
         net.load_state_dict(torch.load('./pth/tiny_ssd_model.pth', map_location=device))
         print('已加载预训练模型 ./pth/tiny_ssd_model.pth')
-        # 预测
-        return 
     except FileNotFoundError:
         print('未找到预训练模型，将从头开始训练')
 
+        # 训练模型
+        train_tinyssd(net, train_iter, device, num_epochs)
 
-    # 训练模型
-    train_tinyssd(net, train_iter, device, num_epochs)
+        # 保存模型
+        torch.save(net.state_dict(), './pth/tiny_ssd_model.pth')
+        print('模型已保存至 ./pth/tiny_ssd_model.pth')
 
-    # 保存模型
-    torch.save(net.state_dict(), './pth/tiny_ssd_model.pth')
-    print('模型已保存至 ./pth/tiny_ssd_model.pth')
-
-
-
-    # # 评估模型
-    # print('-----')
-    # print('评估模型')
-    # X = tv_io.read_image('./img/banana.jpg').unsqueeze(0).float()
-    # print(X.shape)
-    # # ouput(筛选出的锚框总数,6):6(class_id, scores, predicted_bb)
-    # output = predict_tinyssd(net, X, device)
-    # print(f'筛选出的锚框：{output.shape}')
-    
-    # print(output)
-
-    # # 可视化结果
-    # img = X.squeeze(0).permute(1, 2, 0).long()
-    # display(img, output, threshold=0.9)
+    # 预测
+    print('开始进行预测...')
+    img = tv_io.read_image('./img/banana.jpg').unsqueeze(0).float()
+    print(img.shape)
+    predict_tinyssd(net, img, device)
 
 
 if __name__ == '__main__':
