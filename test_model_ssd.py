@@ -252,30 +252,42 @@ def predict_tinyssd(net, img, device):
     net.to(device)
     net.eval()
     with torch.no_grad():
-        img = img.to(device)
         # batch_anchors(1,P*A,4)
         # batch_pred_classes(B,P*A*C)
         # batch_pred_offset(B,P*A*4)
-        batch_anchors, batch_pred_classes, batch_pred_offset, num_classes = net(img)
+        batch_anchors, batch_pred_classes, batch_pred_offset, num_classes = net(img.float().to(device))
         # softmax、NMS处理、筛选出最终保留的框索引
         # box_info(B,P*A,6):(x1,y1,x2,y2,score,cls)
         box_info = filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, num_classes)
-        print(box_info.shape)
+
+        # 压缩batch维度
         box_info = box_info.squeeze(0)
-        # 打印前100个预测框
-        # print(box_info[:100])
-        # 去掉置信度小于0.9的预测框
+
+        # 选出非背景类的预测框
+        mask = box_info[:,5] != -1
+        box_info = box_info[mask]
+
+        # 选出置信度大于0.9的预测框
         mask = box_info[:,4] > 0.9
         box_info = box_info[mask]
-        print(box_info[:100])
-        # 显示预测框
-        H, W = img.shape[2:]
 
+   
+        # 准备数据
+        box_pos = box_info[:, :4] * scale
+        list_box_pos = box_pos.tolist()
+        list_box_label = [round(float(x), 2) for x in box_info[:, 4].tolist()]
+
+
+        h, w = img.shape[2:]
+        scale = torch.tensor((w, w, h, h), dtype=torch.float32,device=device)
         fig,axes = plt.subplots(1,1)
-        axes.imshow(img)
-        
+        axes.imshow(img.squeeze(0).permute(1,2,0))
+        axes.set_title('Banana Detection')
 
-        show_boxes(axes, box_info[:, :4]*torch.tensor((W, W, H, W), dtype=torch.float32,device=device), box_info[:, 5].tolist())
+
+        
+        show_boxes(axes, list_box_pos, list_box_label)
+        plt.tight_layout()
         plt.show()
     
 
@@ -326,8 +338,8 @@ def main():
 
     # 预测
     print('开始进行预测...')
-    # img(1,C,H,W)
-    img = tv_io.read_image('./img/banana.jpg').unsqueeze(0).float()
+    img = tv_io.read_image('./img/banana.jpg')
+    img = img.unsqueeze(0)
     predict_tinyssd(net, img, device)
 
 

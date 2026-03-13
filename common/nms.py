@@ -114,14 +114,14 @@ def filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, nu
         pred_classes = batch_pred_classes[i] # (P*A,C)
         pred_offset = batch_pred_offset[i] # (P*A,4)
 
-        # 0 1 2 3 4 5   pred_score class_id
+        # -1 0 1 2 3 4   pred_score class_id
         # * * * * * *  -> *         2
         # * * * * * *  -> *         1
         # * * * * * *  -> *         3
         # * * * * * *  -> *         0
         # * * * * * *  -> *         4
-        # * * * * * *  -> *         5
-        # * * * * * *  -> *         5
+        # * * * * * *  -> *         3
+        # * * * * * *  -> *         4
         # * * * * * *  -> *         2
         # * * * * * *  -> *         3
         # * * * * * *  -> *         4
