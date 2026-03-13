@@ -256,6 +256,7 @@ def predict_tinyssd(net, img, device):
         # batch_pred_classes(B,P*A*C)
         # batch_pred_offset(B,P*A*4)
         batch_anchors, batch_pred_classes, batch_pred_offset, num_classes = net(img.float().to(device))
+        print("batch_pred_classes:", batch_pred_classes.shape)
         # softmax、NMS处理、筛选出最终保留的框索引
         # box_info(B,P*A,6):(x1,y1,x2,y2,score,cls)
         box_info = filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, num_classes)
@@ -271,21 +272,20 @@ def predict_tinyssd(net, img, device):
         mask = box_info[:,4] > 0.9
         box_info = box_info[mask]
 
+
    
         # 准备数据
+        h, w = img.shape[2:]
+        scale = torch.tensor((w, w, h, h), dtype=torch.float32,device=device)
         box_pos = box_info[:, :4] * scale
         list_box_pos = box_pos.tolist()
         list_box_label = [round(float(x), 2) for x in box_info[:, 4].tolist()]
 
 
-        h, w = img.shape[2:]
-        scale = torch.tensor((w, w, h, h), dtype=torch.float32,device=device)
+        # 绘图
         fig,axes = plt.subplots(1,1)
         axes.imshow(img.squeeze(0).permute(1,2,0))
         axes.set_title('Banana Detection')
-
-
-        
         show_boxes(axes, list_box_pos, list_box_label)
         plt.tight_layout()
         plt.show()

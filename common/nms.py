@@ -96,18 +96,12 @@ def filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, nu
     batch_pred_offset = batch_pred_offset.reshape(batch_pred_offset.shape[0],-1,4)
 
 
+
     # softmax
     # 从“分数”到“概率”
-    # (B,P*A,C) 
-    # 排除第1列背景类别
-    # (B,P*A,C-1)
-    batch_pred_classes = batch_pred_classes[:,:,1:]
-    print("batch_pred_classes:", batch_pred_classes)
-
-
-    # (B,P*A,C-1)
+    # (B,P*A,C)
     batch_pred_classes = F.softmax(batch_pred_classes, dim=-1)
-    print("batch_pred_classes:", batch_pred_classes)
+
 
     
     batch_size = batch_pred_classes.shape[0]
@@ -137,9 +131,11 @@ def filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, nu
         # pred_score(P*A,)
         # class_id(P*A,)
         # 得到原始序列
-        pred_score, class_id = torch.max(pred_classes[:,:], dim=-1)
-        print("pred_score:", pred_score)
-        print("class_id:", class_id)
+        pred_score, class_id = torch.max(pred_classes[:,1:], dim=-1)
+        print("pred_score:", pred_score.shape)
+        print("class_id:", class_id.shape)
+
+
 
 
         # 移动锚框到预测框

@@ -40,7 +40,7 @@ axes[0].set_title('Before NMS')
 h, w = img.shape[:2]
 box_scale = torch.tensor([w, h, w, h])
 
-show_boxes(axes[0], pred_bboxes * box_scale, labels=['dog=0.88', 'dog=0.8', 'dog=0.60', 'cat=0.67'])
+show_boxes(axes[0], pred_bboxes * box_scale)
 
 # 第二幅图:使用NMS之后
 axes[1].imshow(img)
