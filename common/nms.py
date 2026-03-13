@@ -89,7 +89,7 @@ def filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, nu
     pos_threshold=0.009999999 # 得分低的框，置位背景
     device = batch_pred_classes.device
 
-    # anchors(1, NAC, 4) -> anchors(NAC, 4)
+    # anchors(1, P*A, 4) -> anchors(P*A, 4)
     anchors = batch_anchors.squeeze(0)
     # (B,P*A,C)
     batch_pred_classes = batch_pred_classes.reshape(batch_pred_classes.shape[0],-1,num_classes)
@@ -99,7 +99,15 @@ def filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, nu
     # softmax
     # 从“分数”到“概率”
     # (B,P*A,C) 
+    # 排除第1列背景类别
+    # (B,P*A,C-1)
+    batch_pred_classes = batch_pred_classes[:,:,1:]
+    print("batch_pred_classes:", batch_pred_classes)
+
+
+    # (B,P*A,C-1)
     batch_pred_classes = F.softmax(batch_pred_classes, dim=-1)
+    print("batch_pred_classes:", batch_pred_classes)
 
     
     batch_size = batch_pred_classes.shape[0]
@@ -111,7 +119,7 @@ def filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, nu
 
     list_boxes_info = []
     for i in range(batch_size):
-        pred_classes = batch_pred_classes[i] # (P*A,C)
+        pred_classes = batch_pred_classes[i] # (P*A,C-1)
         pred_offset = batch_pred_offset[i] # (P*A,4)
 
         # -1 0 1 2 3 4   pred_score class_id
@@ -129,7 +137,10 @@ def filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, nu
         # pred_score(P*A,)
         # class_id(P*A,)
         # 得到原始序列
-        pred_score, class_id = torch.max(pred_classes[:,1:], dim=-1)
+        pred_score, class_id = torch.max(pred_classes[:,:], dim=-1)
+        print("pred_score:", pred_score)
+        print("class_id:", class_id)
+
 
         # 移动锚框到预测框
         # anchors(P*A,4)(xa, ya, wa, ha)
