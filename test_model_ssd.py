@@ -256,10 +256,10 @@ def predict_tinyssd(net, img, device):
         # batch_pred_classes(B,P*A*C)
         # batch_pred_offset(B,P*A*4)
         batch_anchors, batch_pred_classes, batch_pred_offset, num_classes = net(img.float().to(device))
-        print("batch_pred_classes:", batch_pred_classes.shape)
         # softmax、NMS处理、筛选出最终保留的框索引
         # box_info(B,P*A,6):(x1,y1,x2,y2,score,cls)
         box_info = filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, num_classes)
+
 
         # 压缩batch维度
         box_info = box_info.squeeze(0)
@@ -268,9 +268,13 @@ def predict_tinyssd(net, img, device):
         mask = box_info[:,5] != -1
         box_info = box_info[mask]
 
+        print("box_info:", box_info.shape)
+
         # 选出置信度大于0.9的预测框
         mask = box_info[:,4] > 0.9
         box_info = box_info[mask]
+
+        print("box_info:", box_info.shape)
 
 
    
@@ -314,7 +318,7 @@ def main():
 
 
     # 定义模型
-    sizes = [[0.2, 0.272], [0.37, 0], [0.], [0.54, 0.619], [0.71, 0.79], [0.88, 0.961]]
+    sizes = [[0.2, 0.272], [0.37, 0.447], [0.54, 0.619], [0.71, 0.79], [0.88, 0.961]]
     ratios = [[1, 2, 0.5], [1, 2, 0.5], [1, 2, 0.5], [1, 2, 0.5], [1, 2, 0.5]]
     classes = ['banana']
     net = TinySSD(sizes, ratios, classes)

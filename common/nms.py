@@ -132,8 +132,6 @@ def filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, nu
         # class_id(P*A,)
         # 得到原始序列
         pred_score, class_id = torch.max(pred_classes[:,1:], dim=-1)
-        print("pred_score:", pred_score.shape)
-        print("class_id:", class_id.shape)
 
 
 
