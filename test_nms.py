@@ -1,6 +1,9 @@
 import torch
 import matplotlib.pyplot as plt
-from common import show_boxes,nms,filter_boxes_by_nms, offset_inverse
+from common import show_boxes
+from common import anchor_shift
+from common import filter_boxes_by_nms
+
 
 torch.set_printoptions(2)  # 恢复默认打印精度
 # anchors(NAC, 4)
@@ -11,20 +14,20 @@ anchors = torch.tensor([[0.1, 0.08, 0.52, 0.92],
                         [0.55, 0.2, 0.9, 0.88]])
 
 # 预测偏移量(手动):这里都设为0，是为了简化问题
-offset_preds = torch.tensor([[0, 0, 0, 0], 
+pred_offset = torch.tensor([[0, 0, 0, 0], 
                              [0, 0, 0, 0], 
                              [0, 0, 0, 0], 
                              [0, 0, 0, 0]])
 
 # 预测出的边界框
-pred_bboxes = offset_inverse(anchors, offset_preds)
+pred_bboxes = anchor_shift(anchors, pred_offset)
 
-# cls_probs(NCLS, NAC)
-# 预测出的类别(手动)
-pred_classes = torch.tensor([[0,   0,   0,   0],     # 背景的预测概率
-                             [0.9, 0.8, 0.7, 0.1],   # 狗的预测概率
-                             [0.1, 0.2, 0.3, 0.9]])  # 猫的预测概率
 
+# 预测出的类别(手动)            背景  狗  猫
+pred_classes = torch.tensor([[0, 0.9, 0.1],
+                             [0, 0.8, 0.2],
+                             [0, 0.7, 0.3],
+                             [0, 0.1, 0.8]])
 
 # 读取图像
 img = plt.imread('./img/catdog.jpg')
@@ -42,23 +45,26 @@ show_boxes(axes[0], pred_bboxes * box_scale, labels=['dog=0.9', 'dog=0.8', 'dog=
 axes[1].imshow(img)
 axes[1].set_title('After NMS')
 
-# cls_probs.unsqueeze(dim=0)(1, NCLS, NAC)
-# offset_preds.unsqueeze(dim=0)(1, NAC*4)
-# anchors.unsqueeze(dim=0)(1, NAC, 4)
-# output(1, NAC, 6):(class_id, conf, predicted_bb)
-offset_preds = offset_preds.reshape(-1) # (NAC*4)
-output = filter_boxes_by_nms(pred_classes.unsqueeze(dim=0),
-                            offset_preds.unsqueeze(dim=0),
-                            anchors.unsqueeze(dim=0),
-                            nms_threshold=0.5)
-# 从batch中提取第一个样本的输出
-output = output[0]
+# batch_anchors(1,P*A,4)
+batch_anchors = anchors.unsqueeze(dim=0)
+# batch_pred_classes(1,P*A*C)
+batch_pred_classes = pred_classes.reshape(-1).unsqueeze(dim=0)
+# batch_pred_offset(1,P*A*4)
+batch_pred_offset = pred_offset.reshape(-1).unsqueeze(dim=0)
 
-for i in output.detach().numpy():
-    if i[0] == -1:
+print("batch_anchors:", batch_anchors.shape)
+print("batch_pred_classes:", batch_pred_classes.shape)
+print("batch_pred_offset:", batch_pred_offset.shape)
+
+batch_boxes_info = filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, 3)
+# 从batch中提取第一个样本的输出
+boxes_info = batch_boxes_info[0]
+
+for box_info in boxes_info.detach().numpy():
+    if box_info[0] == -1:
         continue
-    label = ('dog=', 'cat=')[int(i[0])] + str(i[1])
-    show_boxes(axes[1], [torch.tensor(i[2:]) * box_scale], label)
+    label = ('dog=', 'cat=')[int(box_info[5])] + str(box_info[4])
+    show_boxes(axes[1], [torch.tensor(box_info[:4]) * box_scale], label)
 
 plt.tight_layout()
 plt.show()

@@ -109,7 +109,7 @@ def filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, nu
 
 
 
-    list_box_info = []
+    list_boxes_info = []
     for i in range(batch_size):
         pred_classes = batch_pred_classes[i] # (P*A,C)
         pred_offset = batch_pred_offset[i] # (P*A,4)
@@ -168,12 +168,13 @@ def filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, nu
         pred_score[below_min_indices] = 1 - pred_score[below_min_indices]
         
         
-        # pred_boxes(P*A, 4)
-        # pred_score(P*A,1)
-        # class_id(P*A,1)
-        # box_info(P*A, 6)
-        box_info = torch.cat((pred_boxes,pred_score.unsqueeze(1),class_id.unsqueeze(1)), dim=1)
-        list_box_info.append(box_info)
-        # batch_box_info(B, P*A, 6)
-        batch_box_info = torch.stack(list_box_info, dim=0)
-    return batch_box_info
+
+        # boxes_info(P*A, 6)
+            # pred_boxes(P*A, 4)
+            # pred_score(P*A,1)
+            # class_id(P*A,1)
+        boxes_info = torch.cat((pred_boxes,pred_score.unsqueeze(1),class_id.unsqueeze(1)), dim=1)
+        list_boxes_info.append(boxes_info)
+        # batch_boxes_info(B, P*A, 6)
+        batch_boxes_info = torch.stack(list_boxes_info, dim=0)  
+    return batch_boxes_info
