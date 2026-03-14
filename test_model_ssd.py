@@ -19,7 +19,7 @@ from common import show_boxes
 # 输出(B,C_out,H,W)
 def cls_predictor(num_inputs, num_anchors, num_classes):
     return nn.Conv2d(num_inputs,                       # 输入通道数
-                     num_anchors * num_classes,  # 输出通道数：每个锚框预测 num_classes 个值
+                     num_anchors * num_classes,        # 输出通道数：每个像素上有 num_anchors 个锚框，每个锚框预测 num_classes 个值
                      kernel_size=3,                    # 卷积核大小
                      padding=1)                        # 填充大小，保持特征图尺寸不变
 
@@ -29,7 +29,7 @@ def cls_predictor(num_inputs, num_anchors, num_classes):
 # 输出(B,C_out,H,W)
 def bbox_predictor(num_inputs, num_anchors):
     return nn.Conv2d(num_inputs,                       # 输入通道数
-                     num_anchors * 4,                  # 输出通道数：每个锚框预测 4 个值（偏移量）
+                     num_anchors * 4,                  # 输出通道数：每个像素上有 num_anchors 个锚框，每个锚框预测 4 个值（偏移量）
                      kernel_size=3,                    # 卷积核大小
                      padding=1)                        # 填充大小，保持特征图尺寸不变
 
@@ -89,29 +89,34 @@ class TinySSD(nn.Module):
         self.classes = classes
         self.num_classes = len(classes) + 1 # 包含背景类0
         self.num_anchors = []
-        for i, (size, ratio) in enumerate(zip(sizes, ratios)):
+        # 预设多尺度锚框的大小和比例
+        for size, ratio in zip(sizes, ratios):
             print("size:", size, "ratio:", ratio)
+            # 不同尺寸特征图上,每个像素套几个锚框
             self.num_anchors.append(len(size) + len(ratio) - 1)
 
 
-
-        self.blk0 = base_blk() # 三次 down_sample_blk
+        # 3层下采样(卷积 + 压缩器)：把大图像缩小，提取特征到多通道里
+        self.blk0 = base_blk()
+        # 1层卷积：把特征图带过来的通道数，映射到固定通道
         self.cls0 = cls_predictor(64, self.num_anchors[0], self.num_classes)
+        # 1层卷积：把特征图带过来的通道数，映射到锚框坐标
         self.bbox0 = bbox_predictor(64, self.num_anchors[0])
 
-        self.blk1 = down_sample_blk(64, 128) # 一次 down_sample_blk
+        # 继续下采样
+        self.blk1 = down_sample_blk(64, 128)
         self.cls1 = cls_predictor(128, self.num_anchors[1], self.num_classes)
         self.bbox1 = bbox_predictor(128, self.num_anchors[1])
         
-        self.blk2 = down_sample_blk(128, 128) # 一次 down_sample_blk
+        self.blk2 = down_sample_blk(128, 128)
         self.cls2 = cls_predictor(128, self.num_anchors[2], self.num_classes)
         self.bbox2 = bbox_predictor(128, self.num_anchors[2])
         
-        self.blk3 = down_sample_blk(128, 128) # 一次 down_sample_blk
+        self.blk3 = down_sample_blk(128, 128)
         self.cls3 = cls_predictor(128, self.num_anchors[3], self.num_classes)
         self.bbox3 = bbox_predictor(128, self.num_anchors[3])
         
-        self.blk4 = nn.AdaptiveAvgPool2d(output_size=(1, 1)) # 平均池化层：(B,C,H,W)->(B,C,1,1)
+        self.blk4 = nn.AdaptiveAvgPool2d(output_size=(1, 1))
         self.cls4 = cls_predictor(128, self.num_anchors[4], self.num_classes)
         self.bbox4 = bbox_predictor(128, self.num_anchors[4])
 
@@ -119,31 +124,44 @@ class TinySSD(nn.Module):
     def forward(self, X):
 
         anchors, cls_preds, bbox_preds = [None] * 5, [None] * 5, [None] * 5
-
+        print(X.shape)
         X = self.blk0(X) # 生成特征图
+        print(X.shape)
         anchors[0] = generate_anchors(X, self.sizes[0], self.ratios[0]) # (1,P*A,4)
         cls_preds[0] = self.cls0(X)
         bbox_preds[0] = self.bbox0(X)
+
+        print(anchors[0].shape)
+        print(cls_preds[0].shape)
+        print(bbox_preds[0].shape)
 
         X = self.blk1(X) # 继续生成特征图
         anchors[1] = generate_anchors(X, self.sizes[1], self.ratios[1])
         cls_preds[1] = self.cls1(X)
         bbox_preds[1] = self.bbox1(X)
+        print(X.shape)
+        print(cls_preds[1].shape)
 
         X = self.blk2(X) # 继续生成特征图
         anchors[2] = generate_anchors(X, self.sizes[2], self.ratios[2])
         cls_preds[2] = self.cls2(X)
         bbox_preds[2] = self.bbox2(X)
+        print(X.shape)
+        print(cls_preds[2].shape)
 
         X = self.blk3(X) # 继续生成特征图
         anchors[3] = generate_anchors(X, self.sizes[3], self.ratios[3])
         cls_preds[3] = self.cls3(X)
         bbox_preds[3] = self.bbox3(X)
+        print(X.shape)
+        print(cls_preds[3].shape)
 
         X = self.blk4(X) # 继续生成特征图
         anchors[4] = generate_anchors(X, self.sizes[4], self.ratios[4])
         cls_preds[4] = self.cls4(X)
         bbox_preds[4] = self.bbox4(X)
+        print(X.shape)
+        print(cls_preds[4].shape)
 
         # 拼接多尺度层的锚框、分类、边框偏移量
         # (1,P*A,4)
