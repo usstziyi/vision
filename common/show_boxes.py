@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 
 # 显示边界框bbox/锚框anchor
-# boxes:盒子的实际坐标，格式为(左上x,左上y,右下x,右下y)
+# boxes:盒子的实际坐标列表，格式为(左上x,左上y,右下x,右下y)
 def show_boxes(axes, boxes, labels=None,linewidth=2, colors=None):
     """显示某个像素为中心的所有边界框"""
     # 安全检查

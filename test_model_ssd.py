@@ -174,17 +174,21 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
     # 定义优化器
     optimizer = torch.optim.SGD(net.parameters(), lr=0.2, weight_decay=5e-4)
 
-    # batch_pred_classes:模型生成的类别
-    # batch_pred_offset:模型生成的边界框偏移量
+    # batch_pred_classes:（B,P*A*C）
+    # batch_pred_offset:（B,P*A*4）
 
-    # batch_assigned_classes:分配的类别标签
-    # batch_assigned_offset:分配的偏移量标签
-    # batch_assigned_mask:分配的掩码标签
+    # batch_assigned_classes:(B,P*A)
+    # batch_assigned_offset:(B,P*A*4)
+    # batch_assigned_mask:(B,P*A*4)
     # 返回损失值
     def calc_loss(batch_pred_classes, batch_pred_offset, batch_assigned_classes, batch_assigned_offset, batch_assigned_mask, num_classes):
-        # batch_pred_classes (B,(H*W+...)*C_out)
+        # batch_pred_classes (B,P*A*C)
         batch_size = batch_pred_classes.shape[0]
+        # (B,P*A*C)->(B*P*A,C)
+        # (B,P*A)->(B*P*A)
+        # (B*P*A)->(B,P*A) -> (B)
         cls = cls_loss(batch_pred_classes.reshape(-1, num_classes), batch_assigned_classes.reshape(-1)).reshape(batch_size, -1).mean(dim=1)
+        # (B,P*A*4) 和 (B,P*A*4) -> (B,P*A*4) -> (B)
         bbox = bbox_loss(batch_pred_offset * batch_assigned_mask, batch_assigned_offset * batch_assigned_mask).mean(dim=1)
         # 而边界框回归只对正样本有意义（只有正样本才有真实的边界框偏移量）
         # (B)
@@ -193,6 +197,7 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
     for i in range(num_epochs):
         metric = Accumulator(4)
         for image, target in train_iter:
+
             optimizer.zero_grad()
             image = image.to(device) # (B,C,H,W)
             target = target.to(device) # (B,1,5)
@@ -227,9 +232,10 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
 
 # 评估分类准确率
 def eval_class(batch_pred_classes,batch_assigned_classes,num_classes):
-    # (B,num_anchors*num_classes)->(B,num_anchors,num_classes)
+    # (B,P*A*C)->(B,P*A,C)
     batch_pred_classes = batch_pred_classes.reshape(batch_pred_classes.shape[0], -1, num_classes)
-    # (B,num_anchors,num_classes)->(B,num_anchors)
+    # (B,P*A,C)->(B,P*A)
+    # 返回最后一维最大值索引(从0开始),正好对应类别索引
     batch_pred_classes = batch_pred_classes.argmax(dim=-1)
     return float((batch_pred_classes.type(batch_assigned_classes.dtype) == batch_assigned_classes).sum())
 # 评估offset准确率
@@ -265,26 +271,24 @@ def predict_tinyssd(net, img, device):
         box_info = filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, num_classes)
 
 
-        # 压缩batch维度
+        # 压缩batch维度(1,P*A,6)->(P*A,6)
         box_info = box_info.squeeze(0)
 
         # 选出非背景类的预测框
         mask = box_info[:,5] != -1
         box_info = box_info[mask]
 
-        print("box_info:", box_info.shape)
+
 
         # 选出置信度大于0.9的预测框
         mask = box_info[:,4] > 0.9
         box_info = box_info[mask]
 
-        print("box_info:", box_info.shape)
-
 
    
         # 准备数据
         h, w = img.shape[2:]
-        scale = torch.tensor((w, w, h, h), dtype=torch.float32,device=device)
+        scale = torch.tensor((w, h, w, h), dtype=torch.float32,device=device)
         box_pos = box_info[:, :4] * scale
         list_box_pos = box_pos.tolist()
         list_box_label = [round(float(x), 2) for x in box_info[:, 4].tolist()]

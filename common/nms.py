@@ -113,7 +113,7 @@ def filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, nu
 
     list_boxes_info = []
     for i in range(batch_size):
-        pred_classes = batch_pred_classes[i] # (P*A,C-1)
+        pred_classes = batch_pred_classes[i] # (P*A,C)
         pred_offset = batch_pred_offset[i] # (P*A,4)
 
         # -1 0 1 2 3 4   pred_score class_id
