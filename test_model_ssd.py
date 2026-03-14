@@ -122,46 +122,32 @@ class TinySSD(nn.Module):
 
 
     def forward(self, X):
-
         anchors, cls_preds, bbox_preds = [None] * 5, [None] * 5, [None] * 5
-        print(X.shape)
+
         X = self.blk0(X) # 生成特征图
-        print(X.shape)
         anchors[0] = generate_anchors(X, self.sizes[0], self.ratios[0]) # (1,P*A,4)
         cls_preds[0] = self.cls0(X)
         bbox_preds[0] = self.bbox0(X)
-
-        print(anchors[0].shape)
-        print(cls_preds[0].shape)
-        print(bbox_preds[0].shape)
 
         X = self.blk1(X) # 继续生成特征图
         anchors[1] = generate_anchors(X, self.sizes[1], self.ratios[1])
         cls_preds[1] = self.cls1(X)
         bbox_preds[1] = self.bbox1(X)
-        print(X.shape)
-        print(cls_preds[1].shape)
 
         X = self.blk2(X) # 继续生成特征图
         anchors[2] = generate_anchors(X, self.sizes[2], self.ratios[2])
         cls_preds[2] = self.cls2(X)
         bbox_preds[2] = self.bbox2(X)
-        print(X.shape)
-        print(cls_preds[2].shape)
 
         X = self.blk3(X) # 继续生成特征图
         anchors[3] = generate_anchors(X, self.sizes[3], self.ratios[3])
         cls_preds[3] = self.cls3(X)
         bbox_preds[3] = self.bbox3(X)
-        print(X.shape)
-        print(cls_preds[3].shape)
 
         X = self.blk4(X) # 继续生成特征图
         anchors[4] = generate_anchors(X, self.sizes[4], self.ratios[4])
         cls_preds[4] = self.cls4(X)
         bbox_preds[4] = self.bbox4(X)
-        print(X.shape)
-        print(cls_preds[4].shape)
 
         # 拼接多尺度层的锚框、分类、边框偏移量
         # (1,P*A,4)
