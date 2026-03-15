@@ -1,5 +1,6 @@
 import torch
 from .assign import assign_anchor_to_bbox
+from .exchange import box_corner_to_center,box_center_to_corner
 
 
 '''
@@ -12,7 +13,12 @@ def offset_boxes(anchors, gt_boxes):
     # gt_boxes: [N, 4] -> (xb, yb, wb, hb)
 
     eps = 1e-6
+    # 转换为中心点表示
+    anchors = box_corner_to_center(anchors)
 
+    # 转换为角点表示
+    gt_boxes = box_center_to_corner(gt_boxes)
+    
     # 归一化
     dx = (gt_boxes[:, 0] - anchors[:, 0]) / anchors[:, 2]
     dy = (gt_boxes[:, 1] - anchors[:, 1]) / anchors[:, 3]
@@ -27,6 +33,8 @@ def offset_boxes(anchors, gt_boxes):
 
     # [N, 4] -> (dx, dy, dw, dh)
     return torch.stack([dx, dy, dw, dh], dim=1)
+
+
 
 
 '''

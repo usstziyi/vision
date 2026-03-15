@@ -1,29 +1,7 @@
 import torch
+from .exchange import box_corner_to_center,box_center_to_corner
 
 
-def box_corner_to_center(boxes):
-    """Convert from (upper-left, lower-right) to (center, width, height).
-
-    Defined in :numref:`sec_bbox`"""
-    x1, y1, x2, y2 = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
-    cx = (x1 + x2) / 2
-    cy = (y1 + y2) / 2
-    w = x2 - x1
-    h = y2 - y1
-    boxes = torch.stack((cx, cy, w, h), dim=-1)
-    return boxes
-
-def box_center_to_corner(boxes):
-    """Convert from (center, width, height) to (upper-left, lower-right).
-
-    Defined in :numref:`sec_bbox`"""
-    cx, cy, w, h = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
-    x1 = cx - 0.5 * w
-    y1 = cy - 0.5 * h
-    x2 = cx + 0.5 * w
-    y2 = cy + 0.5 * h
-    boxes = torch.stack((x1, y1, x2, y2), dim=-1)
-    return boxes
 
 # 把偏移量施加到锚框上，得到预测框
 # 注：这个函数是预测阶段用的，不是训练阶段用的
@@ -80,13 +58,3 @@ def anchor_shift(anchors, offsets):
     return pred_boxes
 
 
-def offset_inverse(anchors, offset_preds):
-    """Predict bounding boxes based on anchor boxes with predicted offsets.
-
-    Defined in :numref:`subsec_labeling-anchor-boxes`"""
-    anc = box_corner_to_center(anchors)
-    pred_bbox_xy = (offset_preds[:, :2] * anc[:, 2:] / 10) + anc[:, :2]
-    pred_bbox_wh = torch.exp(offset_preds[:, 2:] / 5) * anc[:, 2:]
-    pred_bbox = torch.cat((pred_bbox_xy, pred_bbox_wh), dim=1)
-    predicted_bbox = box_center_to_corner(pred_bbox)
-    return predicted_bbox
