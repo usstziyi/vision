@@ -1,5 +1,30 @@
 import torch
 
+
+def box_corner_to_center(boxes):
+    """Convert from (upper-left, lower-right) to (center, width, height).
+
+    Defined in :numref:`sec_bbox`"""
+    x1, y1, x2, y2 = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
+    cx = (x1 + x2) / 2
+    cy = (y1 + y2) / 2
+    w = x2 - x1
+    h = y2 - y1
+    boxes = torch.stack((cx, cy, w, h), dim=-1)
+    return boxes
+
+def box_center_to_corner(boxes):
+    """Convert from (center, width, height) to (upper-left, lower-right).
+
+    Defined in :numref:`sec_bbox`"""
+    cx, cy, w, h = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
+    x1 = cx - 0.5 * w
+    y1 = cy - 0.5 * h
+    x2 = cx + 0.5 * w
+    y2 = cy + 0.5 * h
+    boxes = torch.stack((x1, y1, x2, y2), dim=-1)
+    return boxes
+
 # 把偏移量施加到锚框上，得到预测框
 # 注：这个函数是预测阶段用的，不是训练阶段用的
 # offsets是预测的偏移量，因为预测阶段没有标签可用
@@ -10,6 +35,11 @@ def anchor_shift(anchors, offsets):
     # 确保输入是浮点数以防整数除法问题
     anchors = anchors.float()
     offsets = offsets.float()  
+
+    # 转换为中心点表示
+    anchors = box_corner_to_center(anchors)
+
+
 
     # 1. 逆向标准化 (Denormalization)
     # 原逻辑: norm_val = raw_val / std
@@ -42,5 +72,21 @@ def anchor_shift(anchors, offsets):
 
     # pred_boxes (P*A, 4) -> (xb, yb, wb, hb)
     pred_boxes = torch.stack([xb, yb, wb, hb], dim=1)
+
+    # 转换为角点表示
+    pred_boxes = box_center_to_corner(pred_boxes)
+
     
     return pred_boxes
+
+
+def offset_inverse(anchors, offset_preds):
+    """Predict bounding boxes based on anchor boxes with predicted offsets.
+
+    Defined in :numref:`subsec_labeling-anchor-boxes`"""
+    anc = box_corner_to_center(anchors)
+    pred_bbox_xy = (offset_preds[:, :2] * anc[:, 2:] / 10) + anc[:, :2]
+    pred_bbox_wh = torch.exp(offset_preds[:, 2:] / 5) * anc[:, 2:]
+    pred_bbox = torch.cat((pred_bbox_xy, pred_bbox_wh), dim=1)
+    predicted_bbox = box_center_to_corner(pred_bbox)
+    return predicted_bbox
