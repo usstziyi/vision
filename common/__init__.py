@@ -4,7 +4,6 @@ from .iou import box_iou
 from .nms import nms,filter_boxes_by_nms
 from .assign import assign_anchor_to_bbox
 from .generate_anchor import generate_anchors
-from .tiny_ssd import TinySSD
 from .anchor2label import anchor_to_label   
 from .dataset import load_data_bananas
 from .show_boxes import show_boxes
@@ -25,7 +24,6 @@ __all__ = [
     'show_boxes',
     'assign_anchor_to_bbox',
     'generate_fmap_anchors',
-    'TinySSD',
     'anchor_to_label',
     'load_data_bananas',
     'filter_boxes_by_nms',

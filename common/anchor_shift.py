@@ -56,5 +56,3 @@ def anchor_shift(anchors, offsets):
 
     
     return pred_boxes
-
-

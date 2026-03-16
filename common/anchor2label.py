@@ -15,9 +15,7 @@ def offset_boxes(anchors, gt_boxes):
     eps = 1e-6
     # 转换为中心点表示
     anchors = box_corner_to_center(anchors)
-
-    # 转换为角点表示
-    gt_boxes = box_center_to_corner(gt_boxes)
+    gt_boxes = box_corner_to_center(gt_boxes)
     
     # 归一化
     dx = (gt_boxes[:, 0] - anchors[:, 0]) / anchors[:, 2]
@@ -26,10 +24,10 @@ def offset_boxes(anchors, gt_boxes):
     dh = torch.log(eps + gt_boxes[:, 3] / anchors[:, 3])
 
     # 标准化
-    dx = (dx - 0) / 0.1
-    dy = (dy - 0) / 0.1
-    dw = (dw - 0) / 0.2
-    dh = (dh - 0) / 0.2
+    dx = (dx - 0) * 10
+    dy = (dy - 0) * 10
+    dw = (dw - 0) * 5
+    dh = (dh - 0) * 5
 
     # [N, 4] -> (dx, dy, dw, dh)
     return torch.stack([dx, dy, dw, dh], dim=1)
@@ -48,7 +46,7 @@ def anchor_to_label(anchors, labels):
     """使用真实边界框标记锚框"""
     # B
     batch_size = labels.shape[0]
-    # anchors(B,P*A,4)
+    # anchors(1,P*A,4)
     anchors = anchors.squeeze(0)
     # P*A   
     num_anchors = anchors.shape[0]
@@ -79,6 +77,7 @@ def anchor_to_label(anchors, labels):
         # 创建类标签和分配的边界框坐标存储空间
         # assigned_classes(P*A):每个锚框的类别标签
         # assigned_bboxes(P*A,4):每个锚框的真实边界框坐标
+        # assigned_classes 被初始化为全 0。这意味着，如果一个锚框没有被任何真实框匹配（即它是负样本），它的标签保持为 0，模型在训练时会将其学习为“背景”。
         assigned_classes = torch.zeros(num_anchors, dtype=torch.long, device=device)          # 用来做分类
         assigned_bboxes = torch.zeros((num_anchors, 4), dtype=torch.float32, device=device)   # 用来做回归
         
@@ -101,18 +100,19 @@ def anchor_to_label(anchors, labels):
 
         # 找出正样本的行
         # assigned_mask(P*A)
-        assigned_mask = (anchors_bbox_map >= 0).long()
+        assigned_mask = (anchors_bbox_map >= 0).float()
         row = torch.nonzero(assigned_mask).reshape(-1)
         col = anchors_bbox_map[row]
 
     
         # 0-bg, 1-c1, 2-c2, ...
         # 而未被分配的锚框（负样本/背景）保持初始值 0
-        assigned_classes[row] = classes[col] + 1
+        assigned_classes[row] = classes[col].long() + 1 # 原始标签 0 -> 训练标签 1 （第1类物体）
         assigned_bboxes[row] = boxes[col]
         # 计算锚框到真实框的偏移量
         # assigned_offset(P*A,4)
-        assigned_offset = offset_boxes(anchors, assigned_bboxes) * assigned_mask.unsqueeze(-1)
+        assigned_offset = offset_boxes(anchors, assigned_bboxes) * (assigned_mask.unsqueeze(-1))
+
 
         # 拼接本batch所有样本的结果
         # list_assigned_classes B(P*A)
@@ -135,3 +135,29 @@ def anchor_to_label(anchors, labels):
     return (batch_assigned_classes, batch_assigned_offset, batch_assigned_mask)
 
 
+# def anchor_to_label(anchors, labels):
+
+#     batch_size, anchors = labels.shape[0], anchors.squeeze(0)
+#     batch_offset, batch_mask, batch_class_labels = [], [], []
+#     device, num_anchors = anchors.device, anchors.shape[0]
+#     for i in range(batch_size):
+#         label = labels[i, :, :]
+#         anchors_bbox_map = assign_anchor_to_bbox(label[:, 1:], anchors, device)
+#         bbox_mask = ((anchors_bbox_map >= 0).float().unsqueeze(-1)).repeat(1, 4)
+
+#         class_labels = torch.zeros(num_anchors, dtype=torch.long, device=device)
+#         assigned_bb = torch.zeros((num_anchors, 4), dtype=torch.float32, device=device)
+
+#         indices_true = torch.nonzero(anchors_bbox_map >= 0)
+#         bb_idx = anchors_bbox_map[indices_true]
+#         class_labels[indices_true] = label[bb_idx, 0].long() + 1
+#         assigned_bb[indices_true] = label[bb_idx, 1:]
+#         # Offset transformation
+#         offset = offset_boxes(anchors, assigned_bb) * bbox_mask
+#         batch_offset.append(offset.reshape(-1))
+#         batch_mask.append(bbox_mask.reshape(-1))
+#         batch_class_labels.append(class_labels)
+#     bbox_offset = torch.stack(batch_offset)
+#     bbox_mask = torch.stack(batch_mask)
+#     class_labels = torch.stack(batch_class_labels)
+#     return (class_labels,bbox_offset, bbox_mask)

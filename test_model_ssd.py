@@ -227,9 +227,10 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
         metric = Accumulator(4)
         for image, target in train_iter:
 
+
             optimizer.zero_grad()
             image = image.to(device) # (B,C,H,W)
-            target = target.to(device) # (B,1,5)
+            target = target.to(device) # (B,1,5) ,原始数据集中label给出的都是实际物体的类别，所以读出来的0不是背景类，而是第1类物体
             # 模型算出锚框、分类、边框偏移量
             # batch_anchors(1,P*A,4)
             # batch_pred_classes(B,P*A*C)
@@ -322,7 +323,6 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'Using device: {device}')
 
-
     # 加载数据集
     batch_size = 32
     train_iter, valid_iter = load_data_bananas(batch_size)
@@ -353,6 +353,12 @@ def main():
         # 保存模型
         torch.save(net.state_dict(), './pth/tiny_ssd_model.pth')
         print('模型已保存至 ./pth/tiny_ssd_model.pth')
+
+
+
+
+
+
 
     # 预测
     print('开始进行预测...')

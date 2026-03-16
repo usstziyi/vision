@@ -116,7 +116,7 @@ def filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, nu
         pred_classes = batch_pred_classes[i] # (P*A,C)
         pred_offset = batch_pred_offset[i] # (P*A,4)
 
-        # -1 0 1 2 3 4   pred_score class_id
+  
         # * * * * * *  -> *         2
         # * * * * * *  -> *         1
         # * * * * * *  -> *         3
@@ -127,11 +127,13 @@ def filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, nu
         # * * * * * *  -> *         2
         # * * * * * *  -> *         3
         # * * * * * *  -> *         4
+        # -1 0 1 2 3 4   pred_score class_id
         # 先假设所有框都是某种物体 -> 算出物体的置信度 -> 用 NMS 去除重叠的物体框 -> 最后把置信度太低的框（其实是背景）扔掉。
         # pred_score(P*A,)
         # class_id(P*A,)
-        # 得到原始序列
-        pred_score, class_id = torch.max(pred_classes[:,1:], dim=-1)
+        # 除背景类外的其他类别的得分
+        pred_classes = pred_classes[:,1:]
+        pred_score, class_id = torch.max(pred_classes, dim=-1) # 预测所得物
 
 
 
@@ -140,7 +142,7 @@ def filter_boxes_by_nms(batch_anchors, batch_pred_classes, batch_pred_offset, nu
         # anchors(P*A,4)(xa, ya, wa, ha)
         # offsets(P*A,4)(dx, dy, dw, dh) (已标准化)
         # pred_boxes(P*A,4)(xb, yb, wb, hb)
-        pred_boxes = anchor_shift(anchors, pred_offset)
+        pred_boxes = anchor_shift(anchors, pred_offset) # 预测所得物
         # 非极大值抑制
         # 混合类别的 NMS:先定类别，后做NMS,不会出现同一个预测框被分配为两个类别的情况
         # 如果两个重叠很高的框，一个是“猫（0.9）”，一个是“狗（0.8）”。
