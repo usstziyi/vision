@@ -98,10 +98,11 @@ def anchor_to_label(anchors, labels):
 
 
 
+
         # 找出正样本的行
-        # assigned_mask(P*A)
-        assigned_mask = (anchors_bbox_map >= 0).float()
-        row = torch.nonzero(assigned_mask).reshape(-1)
+        # pos_mask(P*A)
+        pos_mask = (anchors_bbox_map >= 0)
+        row = torch.nonzero(pos_mask).reshape(-1)
         col = anchors_bbox_map[row]
 
     
@@ -111,7 +112,8 @@ def anchor_to_label(anchors, labels):
         assigned_bboxes[row] = boxes[col]
         # 计算锚框到真实框的偏移量
         # assigned_offset(P*A,4)
-        assigned_offset = offset_boxes(anchors, assigned_bboxes) * (assigned_mask.unsqueeze(-1))
+        assigned_mask = pos_mask.float().unsqueeze(-1).repeat(1, 4)
+        assigned_offset = offset_boxes(anchors, assigned_bboxes) * assigned_mask
 
 
         # 拼接本batch所有样本的结果
@@ -119,52 +121,19 @@ def anchor_to_label(anchors, labels):
         list_assigned_classes.append(assigned_classes)
         # assigned_offset B(P*A*4)
         list_assigned_offset.append(assigned_offset.reshape(-1))
-        # assigned_mask B(P*A)
-        list_assigned_mask.append(assigned_mask)
+        # assigned_mask B(P*A*4)
+        list_assigned_mask.append(assigned_mask.reshape(-1))
 
 
     # 压缩本batch所有样本的结果
     batch_assigned_classes = torch.stack(list_assigned_classes, dim=0)
     batch_assigned_offset = torch.stack(list_assigned_offset, dim=0)
-    batch_assigned_mask = torch.stack(list_assigned_mask, dim=0).repeat(1, 4)
+    batch_assigned_mask = torch.stack(list_assigned_mask, dim=0)
 
     # 每个锚框是否对应真实边界框的掩码
     # batch_assigned_classes(B,P*A)
     # batch_assigned_offset(B,P*A*4)
     # batch_assigned_mask(B,P*A*4)
+
     return (batch_assigned_classes, batch_assigned_offset, batch_assigned_mask)
 
-
-# def anchor_to_label(anchors, labels):
-
-#     batch_size, anchors = labels.shape[0], anchors.squeeze(0)
-#     batch_offset, batch_mask, batch_class_labels = [], [], []
-#     device, num_anchors = anchors.device, anchors.shape[0]
-#     for i in range(batch_size):
-#         label = labels[i, :, :]
-#         anchors_bbox_map = assign_anchor_to_bbox(label[:, 1:], anchors, device)
-#         bbox_mask = ((anchors_bbox_map >= 0).float().unsqueeze(-1)).repeat(1, 4)
-
-#         class_labels = torch.zeros(num_anchors, dtype=torch.long, device=device)
-#         assigned_bb = torch.zeros((num_anchors, 4), dtype=torch.float32, device=device)
-
-
-
-
-#         indices_true = torch.nonzero(anchors_bbox_map >= 0)
-#         bb_idx = anchors_bbox_map[indices_true]
-#         class_labels[indices_true] = label[bb_idx, 0].long() + 1
-#         assigned_bb[indices_true] = label[bb_idx, 1:]
-#         # Offset transformation
-#         offset = offset_boxes(anchors, assigned_bb) * bbox_mask
-#         batch_offset.append(offset.reshape(-1))
-#         batch_mask.append(bbox_mask.reshape(-1))
-#         batch_class_labels.append(class_labels)
-
-
-#     bbox_offset = torch.stack(batch_offset)
-#     bbox_mask = torch.stack(batch_mask)
-#     class_labels = torch.stack(batch_class_labels)
-
-
-#     return (class_labels,bbox_offset, bbox_mask)
