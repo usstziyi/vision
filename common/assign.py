@@ -104,3 +104,32 @@ def assign_anchor_to_bbox(ground_truth, anchors, device, iou_threshold=0.5):
         jaccard[anc_idx, :] = torch.full((num_gt_boxes,), -1)
     # 输出(NAC,)
     return anchors_bbox_map
+
+
+# def assign_anchor_to_bbox(ground_truth, anchors, device, iou_threshold=0.5):
+#     """Assign closest ground-truth bounding boxes to anchor boxes.
+
+#     Defined in :numref:`sec_anchor`"""
+#     num_anchors, num_gt_boxes = anchors.shape[0], ground_truth.shape[0]
+#     # Element x_ij in the i-th row and j-th column is the IoU of the anchor
+#     # box i and the ground-truth bounding box j
+#     jaccard = box_iou(anchors, ground_truth)
+#     # Initialize the tensor to hold the assigned ground-truth bounding box for
+#     # each anchor
+#     anchors_bbox_map = torch.full((num_anchors,), -1, dtype=torch.long,
+#                                   device=device)
+#     # Assign ground-truth bounding boxes according to the threshold
+#     max_ious, indices = torch.max(jaccard, dim=1)
+#     anc_i = torch.nonzero(max_ious >= 0.5).reshape(-1)
+#     box_j = indices[max_ious >= 0.5]
+#     anchors_bbox_map[anc_i] = box_j
+#     col_discard = torch.full((num_anchors,), -1)
+#     row_discard = torch.full((num_gt_boxes,), -1)
+#     for _ in range(num_gt_boxes):
+#         max_idx = torch.argmax(jaccard)  # Find the largest IoU
+#         box_idx = (max_idx % num_gt_boxes).long()
+#         anc_idx = (max_idx / num_gt_boxes).long()
+#         anchors_bbox_map[anc_idx] = box_idx
+#         jaccard[:, box_idx] = col_discard
+#         jaccard[anc_idx, :] = row_discard
+#     return anchors_bbox_map

@@ -79,6 +79,35 @@ def display_model(model):
     total_params = sum(p.numel() for p in model.parameters())
     print(f"Total Parameters: {total_params}")
 
+class Accumulator:
+    """For accumulating sums over `n` variables."""
+    def __init__(self, n):
+        """Defined in :numref:`sec_softmax_scratch`"""
+        self.data = [0.0] * n
+
+    def add(self, *args):
+        self.data = [a + float(b) for a, b in zip(self.data, args)]
+
+    def reset(self):
+        self.data = [0.0] * len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx]
+
+# 评估分类准确率
+def eval_class(batch_pred_classes,batch_assigned_classes,num_classes):
+    # (B,P*A*C)->(B,P*A,C)
+    batch_pred_classes = batch_pred_classes.reshape(batch_pred_classes.shape[0], -1, num_classes)
+    # (B,P*A,C)->(B,P*A)
+    # 返回最后一维最大值索引(从0开始),正好对应类别索引
+    batch_pred_classes = batch_pred_classes.argmax(dim=-1)
+    return float((batch_pred_classes.type(batch_assigned_classes.dtype) == batch_assigned_classes).sum())
+# 评估offset准确率
+def eval_offset(batch_pred_offset,batch_assigned_offset,batch_assigned_mask):
+    return float((torch.abs((batch_pred_offset - batch_assigned_offset) * batch_assigned_mask)).sum())
+
+
+
 
 class TinySSD(nn.Module):
     def __init__(self, sizes, ratios, classes, **kwargs):
@@ -230,32 +259,9 @@ def train_tinyssd(net, train_iter, device, num_epochs=20):
         bbox_mae = metric[2] / metric[3]
         print(f"epoch {i + 1}:" f"class err: {class_err:.6f}, bbox mae: {bbox_mae:.6f}")
 
-# 评估分类准确率
-def eval_class(batch_pred_classes,batch_assigned_classes,num_classes):
-    # (B,P*A*C)->(B,P*A,C)
-    batch_pred_classes = batch_pred_classes.reshape(batch_pred_classes.shape[0], -1, num_classes)
-    # (B,P*A,C)->(B,P*A)
-    # 返回最后一维最大值索引(从0开始),正好对应类别索引
-    batch_pred_classes = batch_pred_classes.argmax(dim=-1)
-    return float((batch_pred_classes.type(batch_assigned_classes.dtype) == batch_assigned_classes).sum())
-# 评估offset准确率
-def eval_offset(batch_pred_offset,batch_assigned_offset,batch_assigned_mask):
-    return float((torch.abs((batch_pred_offset - batch_assigned_offset) * batch_assigned_mask)).sum())
 
-class Accumulator:
-    """For accumulating sums over `n` variables."""
-    def __init__(self, n):
-        """Defined in :numref:`sec_softmax_scratch`"""
-        self.data = [0.0] * n
 
-    def add(self, *args):
-        self.data = [a + float(b) for a, b in zip(self.data, args)]
 
-    def reset(self):
-        self.data = [0.0] * len(self.data)
-
-    def __getitem__(self, idx):
-        return self.data[idx]
 
 # img(1,C,H,W)
 def predict_tinyssd(net, img, device):
