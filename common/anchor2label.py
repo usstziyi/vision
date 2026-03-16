@@ -65,7 +65,7 @@ def anchor_to_label(anchors, labels):
         # labels(B,NGT,5)
         # label(NGT,5)
         label = labels[i, :, :]
-        classes = label[:, 0].long()
+        classes = label[:, 0]
         boxes = label[:, 1:]
 
         # label[:,1:]:(NGT,4):(xmin,ymin,xmax,ymax)
@@ -148,6 +148,9 @@ def anchor_to_label(anchors, labels):
 #         class_labels = torch.zeros(num_anchors, dtype=torch.long, device=device)
 #         assigned_bb = torch.zeros((num_anchors, 4), dtype=torch.float32, device=device)
 
+
+
+
 #         indices_true = torch.nonzero(anchors_bbox_map >= 0)
 #         bb_idx = anchors_bbox_map[indices_true]
 #         class_labels[indices_true] = label[bb_idx, 0].long() + 1
@@ -157,7 +160,11 @@ def anchor_to_label(anchors, labels):
 #         batch_offset.append(offset.reshape(-1))
 #         batch_mask.append(bbox_mask.reshape(-1))
 #         batch_class_labels.append(class_labels)
+
+
 #     bbox_offset = torch.stack(batch_offset)
 #     bbox_mask = torch.stack(batch_mask)
 #     class_labels = torch.stack(batch_class_labels)
+
+
 #     return (class_labels,bbox_offset, bbox_mask)
