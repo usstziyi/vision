@@ -39,6 +39,7 @@ def voc_label_indices(label, colormap2labelindices):
     idx = (colormap[:, :, 0] * 256 * 256 + colormap[:, :, 1] * 256 + colormap[:, :, 2])
     # idx.shape: (320, 480)
     # torch.Size([320, 480])
+    # (H,W)
     return colormap2labelindices[idx] # 取
 
 
@@ -48,6 +49,8 @@ def voc_rand_crop(feature, label, height, width):
     rect = torchvision.transforms.RandomCrop.get_params(feature, (height, width))
     feature = torchvision.transforms.functional.crop(feature, *rect)
     label = torchvision.transforms.functional.crop(label, *rect)
+    # feature: (3, H, W)
+    # label: (3, H, W)
     return feature, label
 
 def read_voc_images(voc_dir, is_train=True):
@@ -62,6 +65,8 @@ def read_voc_images(voc_dir, is_train=True):
     for i, fname in enumerate(images):
         features.append(torchvision.io.read_image(os.path.join(voc_dir, 'JPEGImages', f'{fname}.jpg')))
         labels.append(torchvision.io.read_image(os.path.join(voc_dir, 'SegmentationClass' ,f'{fname}.png'), mode))
+    # features: (N,3,H,W)
+    # labels: (N,3,H,W)
     return features, labels
 
 class VOCSegDataset(torch.utils.data.Dataset):
@@ -90,11 +95,15 @@ class VOCSegDataset(torch.utils.data.Dataset):
             img.shape[2] >= self.crop_size[1])]
 
     def __getitem__(self, idx):
-        # 裁切
+        # feature(3,H,W)
+        # label(3,H,W)
         feature, label = voc_rand_crop(self.features[idx], self.labels[idx], *self.crop_size)
         # 转换为类别索引
+        # (H,W)
         voc_label = voc_label_indices(label, self.colormap2label)
-        # 返回特征和标签，标签的形状为(h,w)
+        # 返回特征和标签，标签的形状为(H,W)
+        # feature(3,H,W)
+        # voc_label(H,W)
         return (feature, voc_label)
 
     def __len__(self):
@@ -141,7 +150,23 @@ def bilinear_kernel(in_channels, out_channels, kernel_size):
     
     return weight
 
-
+def accuracy(preds, labels):
+    """
+    计算像素级准确率
+    preds: (N, C, H, W)
+    labels: (N, H, W)
+    """
+    # 1. 获取预测类别索引 (N, H, W)
+    # argmax 返回的默认类型通常是 long，与常见的 label 类型一致
+    preds_index = preds.argmax(dim=1)
+    
+    # 2. 比较并计算均值
+    # (preds_index == labels) 生成 bool 张量
+    # .float() 转为 0.0/1.0
+    # .mean() 计算所有元素的平均值，即准确率
+    # .item() 将张量转换为标量，方便后续计算
+    acc = (preds_index == labels).float().mean().item()
+    return acc
 
 def train(net, train_iter,test_iter,num_epochs,device):
     net.to(device)
@@ -153,28 +178,51 @@ def train(net, train_iter,test_iter,num_epochs,device):
 
 
     for epoch in range(num_epochs):
-        metric = Accumulator(4)
+        # 1个epoch
+        epoch_size = len(train_iter)
         epoch_loss_sum = 0.0
+        epoch_acc_sum = 0.0
+        # features(N,3,H,W)
+        # labels(N,H,W)
         for i,(features,labels) in enumerate(train_iter):
+            # 1个batch
             batch_size = features.shape[0]
             features = features.to(device)
             labels = labels.to(device)
             optimizer.zero_grad()
-            outputs = net(features)
-            l = loss(outputs, labels).mean(1).mean(1).sum()
+            preds = net(features)
+            # preds(N,num_classes,H,W)
+            # labels(N,H,W)
+            # 输出(N,H,W)->(N,)->(1)
+            l = loss(preds, labels).mean(1).mean(1).sum()
             l.backward()
             optimizer.step()
         
-            # 切断梯度计算
+            # 切断梯度计算:作用范围仅限于其缩进块（上下文管理器）内部。
+            # 一旦代码执行离开该块，梯度计算功能会自动恢复为默认状态（即开启梯度计算）
             with torch.no_grad():
-                print(f"batch loss: {l/batch_size:.6f}")
-                epoch_loss_sum += l/batch_size
-                # train_acc_sum += accuracy(outputs, labels)   
-        epoch_loss_sum /= len(train_iter)
-        # train_acc_sum /= len(train_iter)
-        
-        print(f"======================= epoch {epoch + 1} =======================")
-        print(f"epoch_loss: {epoch_loss_sum:.6f}")
+                batch_loss = l / batch_size
+                batch_acc = accuracy(preds, labels)
+                epoch_loss_sum += batch_loss
+                epoch_acc_sum += batch_acc
+                print(f"batch {i} loss: {batch_loss:.6f}, batch acc: {batch_acc:.6f}")
+        epoch_loss= epoch_loss_sum / epoch_size
+        epoch_acc = epoch_acc_sum / epoch_size
+
+        # 评估模型
+        test_acc_sum = 0.0
+        with torch.no_grad():
+            for features, labels in test_iter:
+                features = features.to(device)
+                labels = labels.to(device)
+                preds = net(features)
+                batch_acc = accuracy(preds, labels)
+                test_acc_sum += batch_acc
+        test_acc = test_acc_sum / len(test_iter)
+
+        print("===============================================================")
+        print(f"epoch {epoch + 1} loss: {epoch_loss:.6f}, train acc: {epoch_acc:.6f}, test acc: {test_acc:.6f}")  
+        print("===============================================================")
 
 
 class Accumulator:
@@ -211,6 +259,8 @@ def main():
 
 
     # 定义模型
+    # 输入(N,3,H,W)
+    # 输出(N,num_classes,H,W)
     pretrained_net = models.resnet18(weights="IMAGENET1K_V1")
     net = nn.Sequential(*list(pretrained_net.children())[:-2])
     net.add_module('final_conv', nn.Conv2d(512, num_classes, kernel_size=1))
