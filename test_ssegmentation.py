@@ -231,7 +231,6 @@ def show_images(imgs, num_rows, num_cols, titles=None, scale=1.5):
     _, axes = plt.subplots(num_rows, num_cols, figsize=figsize)
     axes = axes.flatten()
     for i, (ax, img) in enumerate(zip(axes, imgs)):
-        print(f"img.shape: {img.shape}")
         if torch.is_tensor(img):
             # Tensor Image
             ax.imshow(img.cpu().numpy())
@@ -252,7 +251,7 @@ def predict(net, device):
 
     # 读取图片
     # img(H,W,3)(RGB)
-    img_name = "2007_000123"
+    img_name = "2011_003238"
     img = plt.imread(f'./data/VOCdevkit/VOC2012/JPEGImages/{img_name}.jpg')
     mask = plt.imread(f'./data/VOCdevkit/VOC2012/SegmentationClass/{img_name}.png')
 
@@ -294,42 +293,6 @@ def predict(net, device):
     plt.show()
 
 
-
-
-
-
-    with torch.no_grad():
-        for features, labels in test_iter:
-            features = features.to(device)
-            labels = labels.to(device)
-
-            # 取前四张图片
-            # features(4,3,H,W)
-            features = features[:4]
-            print(features.shape)
-            labels = labels[:4]
-            # preds(4,num_classes,H,W)
-            # 把每个像素的得分转为long类型
-            preds = net(features).long()
-            # preds_index(4,H,W)
-            preds_index = preds.argmax(dim=1)
-            # preds_pixel(4,H,W,3)
-            preds_pixel = colormap[preds_index,:]
-
-            print(features[0])
-
-            features = features.permute(0,2,3,1).long()
-
-            # 拼接
-            # imgs = torch.cat((features, preds_pixel), dim=1)
-
-
-
-            # 显示预测结果
-            show_images(features, num_rows=1, num_cols=4, titles=['preds_pixel'] * 4,scale=2)
-            plt.tight_layout()
-            plt.show()
-            return
             
             
 
@@ -355,7 +318,7 @@ class Accumulator:
 def main():
     # 设置超参数
     batch_size = 32
-    num_epochs = 10
+    num_epochs = 50
     num_classes = 21
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
@@ -387,7 +350,7 @@ def main():
         print("No pretrained model found in ./pth/resnet18_segmentation.pth")
         print("Training model from scratch...")
         # 加载数据集
-        crop_rect = (0,0,320, 480)
+        crop_rect = (320, 480)
         train_iter, test_iter = load_data_voc(batch_size, crop_rect)
         # 训练模型
         train(net, train_iter,test_iter,num_epochs,device)
