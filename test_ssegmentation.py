@@ -3,6 +3,7 @@ import torch
 from torch import nn
 import torchvision
 import torchvision.models as models
+import matplotlib.pyplot as plt
 
 VOC_COLORMAP = [[0, 0, 0], [128, 0, 0], [0, 128, 0], [128, 128, 0],
                 [0, 0, 128], [128, 0, 128], [0, 128, 128], [128, 128, 128],
@@ -79,7 +80,7 @@ class VOCSegDataset(torch.utils.data.Dataset):
         self.transform = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         self.crop_size = crop_size
         features, labels = read_voc_images(voc_dir, is_train=is_train)
-
+        # 标准化图像
         self.features = [self.normalize_image(feature) for feature in self.filter(features)]
         self.labels = self.filter(labels)
         
@@ -156,8 +157,9 @@ def accuracy(preds, labels):
     preds: (N, C, H, W)
     labels: (N, H, W)
     """
-    # 1. 获取预测类别索引 (N, H, W)
+    # 1. 获取预测类别索引
     # argmax 返回的默认类型通常是 long，与常见的 label 类型一致
+    # preds_index (N, H, W)
     preds_index = preds.argmax(dim=1)
     
     # 2. 比较并计算均值
@@ -224,6 +226,112 @@ def train(net, train_iter,test_iter,num_epochs,device):
         print(f"epoch {epoch + 1} loss: {epoch_loss:.6f}, train acc: {epoch_acc:.6f}, test acc: {test_acc:.6f}")  
         print("===============================================================")
 
+def show_images(imgs, num_rows, num_cols, titles=None, scale=1.5):
+    figsize = (num_cols * scale, num_rows * scale)
+    _, axes = plt.subplots(num_rows, num_cols, figsize=figsize)
+    axes = axes.flatten()
+    for i, (ax, img) in enumerate(zip(axes, imgs)):
+        print(f"img.shape: {img.shape}")
+        if torch.is_tensor(img):
+            # Tensor Image
+            ax.imshow(img.cpu().numpy())
+        else:
+            # PIL Image
+            ax.imshow(img)
+        ax.get_xaxis().set_visible(False)
+        ax.get_yaxis().set_visible(False)
+        if titles:
+            ax.set_title(titles[i])
+    return axes
+
+def predict(net, device):
+    net.to(device)
+    net.eval()
+
+    colormap = torch.tensor(VOC_COLORMAP).to(device)
+
+    # 读取图片
+    # img(H,W,3)(RGB)
+    img_name = "2007_000123"
+    img = plt.imread(f'./data/VOCdevkit/VOC2012/JPEGImages/{img_name}.jpg')
+    mask = plt.imread(f'./data/VOCdevkit/VOC2012/SegmentationClass/{img_name}.png')
+
+
+    # 转为tensor
+    # feature(3,H,W)(RGB)
+    feature = torch.from_numpy(img.copy()).permute(2,0,1).to(device)
+
+
+
+    # 裁切
+    crop_rect = (0, 0, 320, 480)
+    feature = torchvision.transforms.functional.crop(feature, *crop_rect)
+    # 归一化
+    feature = feature.float() / 255
+    # 标准化
+    transform = torchvision.transforms.Normalize(mean = [0.48456, 0.456, 0.406], std = [0.229, 0.224, 0.225])
+    feature = transform(feature).unsqueeze(0)
+
+
+    # pred(num_classes,H,W)
+    # 把每个像素的得分转为long类型
+    pred = net(feature).long().squeeze(0)
+    # pred_index(H,W)
+    pred_index = pred.argmax(dim=0)
+
+    # pred_pixel(H,W,3)
+    pred_pixel = colormap[pred_index,:]
+
+    # 转为plt格式
+    pred_pixel = pred_pixel.cpu().numpy()
+
+    # 拼接
+    imgs = [img, pred_pixel, mask]
+
+    # 显示原图
+    show_images(imgs, num_rows=1, num_cols=3, titles=['img','pred_pixel','mask'],scale=2)   
+    plt.tight_layout()
+    plt.show()
+
+
+
+
+
+
+    with torch.no_grad():
+        for features, labels in test_iter:
+            features = features.to(device)
+            labels = labels.to(device)
+
+            # 取前四张图片
+            # features(4,3,H,W)
+            features = features[:4]
+            print(features.shape)
+            labels = labels[:4]
+            # preds(4,num_classes,H,W)
+            # 把每个像素的得分转为long类型
+            preds = net(features).long()
+            # preds_index(4,H,W)
+            preds_index = preds.argmax(dim=1)
+            # preds_pixel(4,H,W,3)
+            preds_pixel = colormap[preds_index,:]
+
+            print(features[0])
+
+            features = features.permute(0,2,3,1).long()
+
+            # 拼接
+            # imgs = torch.cat((features, preds_pixel), dim=1)
+
+
+
+            # 显示预测结果
+            show_images(features, num_rows=1, num_cols=4, titles=['preds_pixel'] * 4,scale=2)
+            plt.tight_layout()
+            plt.show()
+            return
+            
+            
 
 class Accumulator:
     """For accumulating sums over `n` variables."""
@@ -251,9 +359,7 @@ def main():
     num_classes = 21
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
-    # 加载数据集
-    crop_size = (320, 480)
-    train_iter, test_iter = load_data_voc(batch_size, crop_size)
+
 
 
 
@@ -269,11 +375,24 @@ def main():
     W = bilinear_kernel(num_classes, num_classes, 64)
     net.transpose_conv.weight.data.copy_(W)
 
-    # 训练模型
-    train(net, train_iter,test_iter,num_epochs,device)
+    # 根据目录中是否有pth文件判断是否需要加载预训练模型
+    if os.path.exists('./pth/resnet18_segmentation.pth'):
+        net.load_state_dict(torch.load('./pth/resnet18_segmentation.pth'))
+        print("Loaded pretrained model from ./pth/resnet18_segmentation.pth")
+        print("Using pretrained model for inference...")
+        # 使用模型
+        predict(net, device)
 
-    # 保存模型
-    torch.save(net.state_dict(), './pth/resnet18_segmentation.pth')
+    else:
+        print("No pretrained model found in ./pth/resnet18_segmentation.pth")
+        print("Training model from scratch...")
+        # 加载数据集
+        crop_rect = (0,0,320, 480)
+        train_iter, test_iter = load_data_voc(batch_size, crop_rect)
+        # 训练模型
+        train(net, train_iter,test_iter,num_epochs,device)
+        # 保存模型
+        torch.save(net.state_dict(), './pth/resnet18_segmentation.pth')
 
 
 
