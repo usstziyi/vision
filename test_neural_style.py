@@ -14,9 +14,9 @@ rgb_mean = torch.tensor([0.485, 0.456, 0.406]) # （3,)
 rgb_std = torch.tensor([0.229, 0.224, 0.225]) # （3,)
 
 # img plt(3, H, W)
-def preprocess(img, crop_shape):
+def preprocess(img, resize_shaple):
     transforms = torchvision.transforms.Compose([
-        torchvision.transforms.Resize(crop_shape),
+        torchvision.transforms.Resize(resize_shaple),
         torchvision.transforms.ToTensor(), # 转 Tensor 并缩放到 [0, 1]
         torchvision.transforms.Normalize(mean=rgb_mean, std=rgb_std)])
     # (1,3,H',W')
@@ -124,10 +124,10 @@ def gram(X):
 
 # 风格损失
 # synthesized_style(1, C, H, W)
-# style_gram(C,C)
-def style_loss(synthesized_style, style_gram):
+# style(C,C)
+def style_loss(synthesized_style, style):
     # detach() 从计算图中断开该张量，使其不参与梯度计算
-    return torch.square(gram(synthesized_style) - style_gram.detach()).mean()
+    return torch.square(gram(synthesized_style) - gram(style.detach())).mean()
 
 
 # 总变分损失
@@ -142,12 +142,13 @@ def tv_loss(synthesized_img):
 
 # 封装损失函数
 # synthesized_img(1, C, H, W)
-def compute_loss(synthesized_img, list_synthesized_contents, list_synthesized_styles, list_contents, list_styles_gram):
+def compute_loss(synthesized_img, list_synthesized_contents, list_synthesized_styles, list_contents, list_styles):
     content_weight, style_weight, tv_weight = 1, 1e3, 10
     # 内容损失
     contents_l = [content_loss(synthesized_content, content) * content_weight for synthesized_content, content in zip(list_synthesized_contents, list_contents)]
     # 风格损失
-    styles_l = [style_loss(synthesized_style, style_gram) * style_weight for synthesized_style, style_gram in zip(list_synthesized_styles, list_styles_gram)]
+    styles_l = [style_loss(synthesized_style, style) * style_weight for synthesized_style, style in zip(list_synthesized_styles, list_styles)]
+
     # 全变分损失
     tv_l = tv_loss(synthesized_img) * tv_weight     
     # 对所有损失求和
@@ -159,42 +160,57 @@ def compute_loss(synthesized_img, list_synthesized_contents, list_synthesized_st
 # styles(1, 64, 300, 450)
 def train(net, content_img, style_img, device, lr, num_epochs, lr_decay_epoch):
     net.to(device)
-    net.eval()
-
-    # 损失函数
-    # 初始化优化器
-    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
-    # 初始化学习率调度器
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, lr_decay_epoch, 0.8)
-
-
-    # 初始化生成图像[1, 3, 300, 450]
+    # 重要：冻结VGG网络的参数
+    net.eval()  # 设置为评估模式
+    for param in net.parameters():
+        param.requires_grad = False
+    
+    # 初始化生成图像网络[1, 3, 300, 450]
     synthesized_net = SynthesizedImage(content_img.shape).to(device)
     synthesized_net.weight.data.copy_(content_img.data)
     synthesized_img = synthesized_net()
 
+    # 损失函数
+    # 在外部
+
+    # 初始化优化器 - 应该优化合成图像的参数，而不是VGG网络的参数
+    optimizer = torch.optim.Adam(synthesized_net.parameters(), lr=lr)  # 修改这里
+    # 初始化学习率调度器
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, lr_decay_epoch, 0.8)
 
 
+    
     # 提取"内容图像"特征
     list_contents = get_contents(net, content_img, content_layers)
     # 提取"风格图像"特征
     list_styles = get_styles(net, style_img, style_layers)
-    list_styles_gram = [gram(Y) for Y in list_styles]
 
- 
-
+    # 开启交互绘图模式
+    plt.ion()
+    fig, ax = plt.subplots()
 
     for epoch in range(num_epochs):
         optimizer.zero_grad()
         # 提取"生成图像" 图像特征 风格特征
         list_synthesized_contents, list_synthesized_styles = get_synthesized(net, synthesized_img, content_layers, style_layers)
         # 计算损失
-        contents_l, styles_l, tv_l, l = compute_loss(synthesized_img, list_synthesized_contents, list_synthesized_styles, list_contents, list_styles_gram)
+        contents_l, styles_l, tv_l, l = compute_loss(synthesized_img, list_synthesized_contents, list_synthesized_styles, list_contents, list_styles)
         l.backward()
         optimizer.step()
         scheduler.step() # 更新学习率调度器，调整下一轮的学习率
         print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {l.item():.4f}, LR: {optimizer.param_groups[0]['lr']:.6f}")
-        
+
+        # 显示当前合成图像
+        if epoch % 10 == 0:
+            img = postprocess(synthesized_img)
+            ax.imshow(img)
+            ax.axis('off')
+            plt.pause(0.01)
+
+    # 关闭交互绘图模式
+    plt.ioff()
+    plt.tight_layout()
+    plt.show()
 
 
 
@@ -212,6 +228,12 @@ def main():
     # 加载数据
     content_img = Image.open('./img/rainier.jpg')
     style_img = Image.open('./img/autumn-oak.jpg')
+
+    print(content_img.size, style_img.size)
+
+
+
+
     # 预处理[1, 3, 300, 450]
     content_img = preprocess(content_img, (300, 450)).to(device)
     style_img = preprocess(style_img, (300, 450)).to(device)
