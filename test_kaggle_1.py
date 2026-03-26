@@ -5,6 +5,7 @@ import shutil
 import pandas as pd
 import torch
 import torchvision
+import matplotlib.pyplot as plt
 from torch import nn
 
 
@@ -101,6 +102,8 @@ def train(net, device, train_iter, valid_iter, num_epochs,lr,wd,momentum,step_si
     optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=momentum, weight_decay=wd)
     # 初始化学习率衰减器
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size, gamma)
+    # 保存每个epoch的损失
+    epoch_losses = []
     for epoch in range(num_epochs):
         for i, (featrues,labels) in enumerate(train_iter):
             featrues = featrues.to(device)
@@ -115,15 +118,29 @@ def train(net, device, train_iter, valid_iter, num_epochs,lr,wd,momentum,step_si
             l.sum().backward()
             # 更新参数
             optimizer.step()
-        
+            
             # 禁用梯度计算，节省内存并加速计算（仅用于打印损失，不需要反向传播）
             # 不影响下一轮训练，因为每次迭代都会重新计算梯度
             # 这里只是用于打印损失，禁用梯度计算可以节省内存
             with torch.no_grad():
+                batch_loss = l.sum().item() / featrues.shape[0]
                 # 打印损失
-                print(f'Epoch {epoch+1}, Batch {i}, Loss: {l.sum()/featrues.shape[0]:.4f}')
+                print(f'Epoch {epoch+1}, Batch {i}, Loss: {batch_loss:.4f}')
         # 学习率衰减
         scheduler.step()
+        # 保存当前epoch的最后一个batch损失
+        epoch_losses.append(batch_loss)
+    
+    # 绘制损失折线图
+    plt.figure(figsize=(10, 6))
+    plt.plot(epoch_losses, label='Training Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training Loss Curve')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig('./table/epoch_loss_curve.png')
+    plt.show()
 
 
 
@@ -154,7 +171,7 @@ def main():
     # 定义超参数
     num_classes = 10
     batch_size = 32
-    num_epochs = 100
+    num_epochs = 50
     data_dir = './data/kaggle_cifar10_tiny'
     lr = 2e-4
     wd = 5e-4
